@@ -1,10 +1,12 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE BangPatterns        #-}
+{-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Main module for the rlwe-challenges executable.
 
 module Main where
 
-import Control.Monad (when)
+import Control.Monad
 import Data.Time.Clock.POSIX
 import Options
 
@@ -13,11 +15,17 @@ import System.Exit
 import System.IO
 
 import Beacon
-import Common   (InstanceID, printANSI)
+import Common
 import Generate
 import Params
 import Suppress
 import Verify
+
+-- extras
+import Control.Monad.CryptoRandom
+import Control.Monad.IO.Class
+import Crypto.Lol.Types.Random
+--import System.Random
 
 data MainOpts =
   MainOpts
@@ -56,6 +64,35 @@ data NullOpts = NullOpts
 instance Options NullOpts where
   defineOptions = pure NullOpts
 
+bar :: MonadCRandom e rnd => rnd Int
+bar = go 1000000 0
+  where go :: (MonadCRandom e rnd) => Int -> Int -> rnd Int
+        go 0 !acc = return acc
+        go n !acc = do
+          !val <- getCRandom
+          go (n-1) (acc+val)
+
+{-
+main :: IO ()
+main = print $ sum [(1::Int)..1000000]
+
+-- homegrown replicateM variant
+main :: IO ()
+main = do
+  g <- newGenIO
+  let (Right y) = evalCRand (bar :: CRand InstDRBG GenError Int) g
+  print y
+-}
+
+-- replicateM version
+main :: IO ()
+main = do
+  g :: InstDRBG <- newGenIO
+  let (Right y) = evalCRand (do xs :: [Int] <- replicateM 1000000 getCRandom
+                                return $ sum xs) g
+  print y
+
+{-  original
 main :: IO ()
 main = do
   -- for nice printing when running executable
@@ -65,6 +102,7 @@ main = do
     , subcommand "suppress" suppress
     , subcommand "verify" verify
     ]
+-}
 
 generate :: MainOpts -> GenOpts -> [String] -> IO ()
 generate MainOpts{..} GenOpts{..} _ = do

@@ -44,10 +44,10 @@ type ChallengeID = Int32
 type InstanceID = Int32
 
 -- CJP: testing performance of null drbg
--- type InstDRBG = CtrDRBG
+type InstDRBG = CtrDRBG
 
-type InstDRBG = NullDRBG
-data NullDRBG = Null Word8
+--type InstDRBG = NullDRBG
+newtype NullDRBG = Null Word8
 
 foo :: Int -> NullDRBG -> (B.ByteString, NullDRBG)
 foo l (Null i) =
@@ -61,7 +61,7 @@ instance CryptoRandomGen NullDRBG where
   reseedInfo _ = Never
   reseedPeriod _ = Never
   genBytesWithEntropy l _ g = Right $ foo l g
-  reseed _ g = Right g
+  reseed _ = Right
   newGenIO = return $ Null 0
 
 -- | Tensor type used to generate and verify instances
