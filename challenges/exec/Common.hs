@@ -38,6 +38,7 @@ import Text.ProtocolBuffers.Header (ReflectDescriptor, Wire)
 -- these are for NullDRBG
 import qualified Data.ByteString as B
 import           Data.Tagged
+import           Data.Word
 
 type ChallengeID = Int32
 type InstanceID = Int32
@@ -46,17 +47,22 @@ type InstanceID = Int32
 -- type InstDRBG = CtrDRBG
 
 type InstDRBG = NullDRBG
-data NullDRBG = Null
+data NullDRBG = Null Word8
+
+foo :: Int -> NullDRBG -> (B.ByteString, NullDRBG)
+foo l (Null i) =
+  let (bs, Just j) = B.unfoldrN l (\x -> Just (x,x+1)) i
+  in (bs, Null j)
 
 instance CryptoRandomGen NullDRBG where
-  newGen _ = Right Null
+  newGen _ = Right $ Null 0
   genSeedLength = Tagged 0
-  genBytes l Null = Right (B.replicate l 0, Null)
-  reseedInfo Null = Never
-  reseedPeriod Null = Never
-  genBytesWithEntropy l _ Null = Right (B.replicate l 0, Null)
-  reseed _ Null = Right Null
-  newGenIO = return Null
+  genBytes l g = Right $ foo l g
+  reseedInfo _ = Never
+  reseedPeriod _ = Never
+  genBytesWithEntropy l _ g = Right $ foo l g
+  reseed _ g = Right g
+  newGenIO = return $ Null 0
 
 -- | Tensor type used to generate and verify instances
 type T = CT
