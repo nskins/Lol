@@ -85,4 +85,6 @@ executable rlwe-challenges
                  transformers,
                  -- remove
                  random,
-                 monadcryptorandom
+                 monadcryptorandom,
+                 deepseq,
+                 vector

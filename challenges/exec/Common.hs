@@ -45,8 +45,8 @@ type InstanceID = Int32
 
 -- CJP: testing performance of null drbg
 type InstDRBG = CtrDRBG
-
 --type InstDRBG = NullDRBG
+
 newtype NullDRBG = Null Word8
 
 foo :: Int -> NullDRBG -> (B.ByteString, NullDRBG)

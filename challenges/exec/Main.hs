@@ -1,6 +1,9 @@
-{-# LANGUAGE BangPatterns        #-}
-{-# LANGUAGE RecordWildCards     #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE BangPatterns               #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
 
 -- | Main module for the rlwe-challenges executable.
 
@@ -22,10 +25,17 @@ import Suppress
 import Verify
 
 -- extras
-import Control.Monad.CryptoRandom
-import Control.Monad.IO.Class
-import Crypto.Lol.Types.Random
+import           Control.DeepSeq
+import           Control.Monad.CryptoRandom
+import           Control.Monad.Except
+import           Control.Monad.Identity
+import           Control.Monad.IO.Class
+import           Crypto.Lol.Types.Random
+import qualified Data.Vector                as V
+import qualified Data.Vector.Unboxed        as U
 --import System.Random
+import Control.Arrow
+import Control.Monad.State.Strict as Strict
 
 data MainOpts =
   MainOpts
@@ -72,6 +82,47 @@ bar = go 1000000 0
           !val <- getCRandom
           go (n-1) (acc+val)
 
+-- CJP: experimental stuff starts here
+newtype CRandT' g e m a = CRandT' { unCRandT' :: Strict.StateT g (ExceptT e m) a }
+  deriving (Functor, Applicative, Monad, MonadIO, MonadError e, MonadFix)
+
+type CRand' g e = CRandT' g e Identity
+
+evalCRand' :: CRand' g GenError a -> g -> Either GenError a
+evalCRand' m = runIdentity . evalCRandT' m
+{-# INLINE evalCRand' #-}
+
+evalCRandT' :: (ContainsGenError e, Monad m) => CRandT' g e m a -> g -> m (Either e a)
+evalCRandT' m g = liftM (right fst) (runCRandT' m g)
+{-# INLINE evalCRandT' #-}
+
+runCRandT' :: ContainsGenError e => CRandT' g e m a -> g -> m (Either e (a,g))
+runCRandT' m g = runExceptT . flip Strict.runStateT g . unCRandT' $ m
+{-# INLINE runCRandT' #-}
+
+instance (ContainsGenError e, Monad m, CryptoRandomGen g)
+  => MonadCRandom e (CRandT' g e m) where
+  getCRandom  = wrap crandom
+  {-# INLINE getCRandom #-}
+  getBytes i = wrap (genBytes i)
+  {-# INLINE getBytes #-}
+  getBytesWithEntropy i e = wrap (genBytesWithEntropy i e)
+  {-# INLINE getBytesWithEntropy #-}
+  doReseed bs = CRandT' $
+    get >>= \g ->
+      case reseed bs g of
+        Right g' -> put g'
+        Left  x  -> throwError (fromGenError x)
+  {-# INLINE doReseed #-}
+
+wrap :: (Monad m, ContainsGenError e) => (g -> Either GenError (a,g)) -> CRandT' g e m a
+wrap f = CRandT' $ do
+  g <- get
+  case f g of
+    Right (a,g') -> put g' >> return a
+    Left x -> throwError (fromGenError x)
+{-# INLINE wrap #-}
+
 {-
 main :: IO ()
 main = print $ sum [(1::Int)..1000000]
@@ -88,8 +139,14 @@ main = do
 main :: IO ()
 main = do
   g :: InstDRBG <- newGenIO
-  let (Right y) = evalCRand (do xs :: [Int] <- replicateM 1000000 getCRandom
-                                return $ sum xs) g
+  -- NullDRBG: evalRand (lazy) takes 2.1s; evalCRand' (strict) takes 2.1s (no difference)
+
+  -- CtrDRBG with []: evalCRand (lazy) 6.2s; evalCRand' (strict) 3.9s.
+  --   (doesn't matter whether we deepseq xs before summing)
+  -- CtrDRBG unboxed Vector: lazy and strict both 3.9s
+  -- CtrDRBG   boxed Vector: lazy and strict both 3.9s
+  let (Right y) = evalCRand' (do xs :: U.Vector Int <- U.replicateM 1000000 getCRandom
+                                 return $ U.sum xs) g
   print y
 
 {-  original
