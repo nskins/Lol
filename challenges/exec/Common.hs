@@ -35,9 +35,28 @@ import Text.Printf
 import Text.ProtocolBuffers        (messageGet)
 import Text.ProtocolBuffers.Header (ReflectDescriptor, Wire)
 
+-- these are for NullDRBG
+import qualified Data.ByteString as B
+import           Data.Tagged
+
 type ChallengeID = Int32
 type InstanceID = Int32
-type InstDRBG = CtrDRBG
+
+-- CJP: testing performance of null drbg
+-- type InstDRBG = CtrDRBG
+
+type InstDRBG = NullDRBG
+data NullDRBG = Null
+
+instance CryptoRandomGen NullDRBG where
+  newGen _ = Right Null
+  genSeedLength = Tagged 0
+  genBytes l Null = Right (B.replicate l 0, Null)
+  reseedInfo Null = Never
+  reseedPeriod Null = Never
+  genBytesWithEntropy l _ Null = Right (B.replicate l 0, Null)
+  reseed _ Null = Right Null
+  newGenIO = return Null
 
 -- | Tensor type used to generate and verify instances
 type T = CT
