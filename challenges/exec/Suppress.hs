@@ -36,7 +36,7 @@ suppressMain path = do
   challs <- challengeList path
 
   -- load all local XML files first
-  st <- loadXML
+  st <- loadXML path
 
   -- Suppress a secret from each challenge, collecting beacon records as we go
   recs <- flip execStateT st $ mapM_ (suppressChallenge path) challs
@@ -49,9 +49,9 @@ type RecordState = Map BeaconEpoch Record
 
 -- | Load (from current directory) all XML files containing beacon
 -- records into a map
-loadXML :: (MonadIO m) => m RecordState
-loadXML = liftIO $ do
-  names <- filter (".xml" `isSuffixOf`) <$> getDirectoryContents "."
+loadXML :: (MonadIO m) => FilePath -> m RecordState
+loadXML path = liftIO $ do
+  names <- filter (".xml" `isSuffixOf`) <$> getDirectoryContents path
   records <- catMaybes . fmap fromXML <$> sequence (readFile <$> names)
   return $ fromList $ (\x -> (fromIntegral $ timeStamp x, x)) <$> records
 
