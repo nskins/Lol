@@ -1,7 +1,7 @@
 {-# LANGUAGE BangPatterns, ConstraintKinds, DataKinds, FlexibleContexts,
              FlexibleInstances, GADTs, GeneralizedNewtypeDeriving,
-             KindSignatures, MultiParamTypeClasses,
-             RankNTypes, RebindableSyntax, RoleAnnotations,
+             KindSignatures, MultiParamTypeClasses, NoImplicitPrelude,
+             PolyKinds, RankNTypes, RebindableSyntax, RoleAnnotations,
              ScopedTypeVariables, TypeOperators #-}
 
 -- | A simple DSL for tensoring Repa arrays and other common functionality
@@ -12,7 +12,7 @@ module Crypto.Lol.Cyclotomic.Tensor.RepaTensor.RTCommon
 , module Data.Array.Repa.Eval
 , module Data.Array.Repa.Repr.Unboxed
 , Arr(..), repl, replM, eval, evalM, fTensor, ppTensor
-, Trans(Id), trans, dim, (.*), (@*), force
+, Trans(Id), trans, (.*), (@*), force
 , mulMat, mulDiag
 , scalarPow'
 , sumS, sumAllS
@@ -105,20 +105,23 @@ instance (Arbitrary r, Unbox r, Fact m) => Arbitrary (Arr m r) where
 -- | For a factored index, tensors up any function defined for (and
 -- tagged by) any prime power
 fTensor :: forall m r mon . (Fact m, Monad mon)
-  => (forall pp . (PPow pp) => TaggedT pp mon (Trans r))
-  -> TaggedT m mon (Trans r)
+  => (forall pp . (PPow pp) => mon (Trans pp r))
+  -> TaggedT mon (Trans m r)
 
 fTensor func = tagT $ go $ sUnF (sing :: SFactored m)
   where
-    go :: Sing (pplist :: [PrimePower]) -> mon (Trans r)
+    go :: Sing (pplist :: [PrimePower]) -> mon (Trans m r)
     go spps = case spps of
           SNil -> return $ Id 1
-          (SCons spp rest) -> do
+          (SCons (spp :: Sing pp) rest) -> do
             rest' <- go rest
-            func' <- withWitnessT func spp
+            func' :: Trans pp r <- func
             return $ rest' @* func'
 {-# INLINABLE fTensor #-}
 
+-- (Fact m, Fact m', PPow pp') => (Trans m' r) \otimes (Trans pp' r) :: Trans m r
+-- (Bin b , Prime p, PPow pp) => (Trans b r) \otimes (Trans p r) :: Trans pp r
+{-
 -- | For a prime power p^e, tensors up any function f defined for
 -- (and tagged by) a prime to @I_(p^{e-1}) \otimes f@
 ppTensor :: forall pp r mon . (PPow pp, Monad mon)
@@ -131,73 +134,63 @@ ppTensor func = tagT $ case (sing :: SPrimePower pp) of
     let lts = withWitness valuePPow pp `div` withWitness valuePrime sp
     return $ Id lts @* func'
 {-# INLINABLE ppTensor #-}
-
+-}
 
 -- deeply embedded DSL for transformations and their various
 -- compositions
 
 -- (dim(f), f) where f operates on innermost dimension of array
-data Tensorable r = Tensorable
-  !Int !(forall rep . Source rep r => Array rep DIM2 r -> Array D DIM2 r)
+data TransC (l :: k) (m :: k) (r :: k) b = Tensorable !(Array D DIM2 b -> Array D DIM2 b)
 
 -- transform component: a Tensorable with particular I_l, I_r
-type TransC r = (Tensorable r, Int, Int)
+--type TransC l m r b = (Tensorable b, Int, Int)
 
 -- full transform: sequence of zero or more components
 -- | a DSL for tensor transforms on Repa arrays
-data Trans r = Id !Int                      -- ^| identity sentinel
-             | TSnoc !(Trans r) !(TransC r) -- ^| (function) composition of transforms
-
-dimC :: TransC r -> Int
-dimC (Tensorable d _, l, r) = l*d*r
-{-# INLINABLE dimC #-}
-
--- | Returns the (linear) dimension of a transform
-dim :: Trans r -> Int
-dim (Id n) = n
-dim (TSnoc _ f) = dimC f        -- just use dimension of head
-{-# INLINABLE dim #-}
+data Trans (n :: k) b where
+  Id :: Trans n b                                                            -- ^| identity sentinel
+  TSnoc :: (l * m * r ~ n, Index m, Index r) => !(Trans n b) -> !(TransC l m r b) -> Trans n b -- ^| (function) composition of transforms
 
 -- | smart constructor from a Tensorable
-trans :: Int -> (forall rep . Source rep r => Array rep DIM2 r -> Array D DIM2 r) -> Trans r
-trans d f = TSnoc (Id d) (Tensorable d f, 1, 1)
+trans :: forall p b . (Fact p) => (Array D DIM2 b -> Array D DIM2 b) -> Trans p b
+trans f = TSnoc Id (Tensorable f :: TransC F1 p F1 b) \\ coerceMulID (Proxy::Proxy p)
 {-# INLINABLE trans #-}
 
 -- | compose transforms
-(.*) :: Trans r -> Trans r -> Trans r
-f .* g | dim f == dim g = f ..* g
-       | otherwise = error $ "(.*): transform dimensions don't match "
-                     LP.++ show (dim f) LP.++ ", " LP.++ show (dim g)
-  where
-    f' ..* (Id _) = f'          -- drop sentinel
-    f' ..* (TSnoc rest g') = TSnoc (f' ..* rest) g'
+(.*) :: Trans m r -> Trans m r -> Trans m r
+f .*  Id = f          -- drop sentinel
+f .* (TSnoc rest g') = TSnoc (f .* rest) g'
 {-# INLINABLE (.*) #-}
 
 -- | tensor/Kronecker product (otimes)
-(@*) :: Trans r -> Trans r -> Trans r
+(@*) :: forall n1 n2 b . (PPow n1, Fact n2) => Trans n1 b -> Trans n2 b -> Trans ((PpToF n1) * n2) b
 -- merge identity transforms
-(Id n) @* (Id m) = Id (n*m)
+Id @* Id = Id
 -- Id on left or right
-i@(Id n) @* (TSnoc g' (g, l, r)) = TSnoc (i @* g') (g, n*l, r)
-(TSnoc f' (f, l, r)) @* i@(Id n) = TSnoc (f' @* i) (f, l, r*n)
+i@Id @* (TSnoc g' (g :: TransC l m r b)) = TSnoc (i @* g') (coerce g :: TransC ((PpToF n1)*l) m r b) \\ coerceMul (Proxy::Proxy l) (Proxy::Proxy m) (Proxy::Proxy r) (Proxy::Proxy (PpToF n1))
+(TSnoc f' (f :: TransC l m r b)) @* i@Id = TSnoc (f' @* i) (coerce f :: TransC l m (r*n2) b) \\ coerceMul (Proxy::Proxy l) (Proxy::Proxy m) (Proxy::Proxy r) (Proxy::Proxy n2)
 -- no Ids: compose
-f @* g = (f @* Id (dim g)) .* (Id (dim f) @* g)
+f @* g = (f @* (Id :: Trans n2 b)) .* ((Id :: Trans n1 b) @* g)
 {-# INLINABLE (@*) #-}
 
-evalC :: (Unbox r) => TransC r -> Array U DIM1 r -> Array U DIM1 r
-evalC (Tensorable d f, _, r) = force . unexpose r . f . expose d r
+evalC :: forall l m r b . (Unbox b, Index m, Index r) => TransC l m r b -> Array U DIM1 b -> Array U DIM1 b
+evalC t@(Tensorable f) =
+  let dim = proxy totient (Proxy :: Proxy m)
+      r = proxy totient (Proxy::Proxy r)
+  in force . unexpose r . f . expose dim r
 {-# INLINABLE evalC #-}
 
 -- | Creates an evaluatable Haskell function from a tensored transform
-eval :: (Unbox r) => Tagged m (Trans r) -> Arr m r -> Arr m r
-eval x = coerce $ eval' $ untag x
-  where eval' (Id _) = id
+eval :: (Unbox r, Fact m) => Trans m r -> Arr m r -> Arr m r
+eval = coerce . eval'
+  where eval' :: (Unbox r, Fact m) => Trans m r -> Array U DIM1  r -> Array U DIM1 r
+        eval' Id = id
         eval' (TSnoc rest f) = eval' rest . evalC f
 {-# INLINABLE eval #-}
 
 -- | Monadic version of 'eval'
-evalM :: (Unbox r, Monad mon) => TaggedT m mon (Trans r) -> mon (Arr m r -> Arr m r)
-evalM = fmap (eval . return) . untagT
+evalM :: (Unbox r, Monad mon, Fact m) => mon (Trans m r) -> mon (Arr m r -> Arr m r)
+evalM = fmap eval
 {-# INLINE evalM #-}
 
 -- | maps the innermost dimension to a 2-dim array with innermost dim d,

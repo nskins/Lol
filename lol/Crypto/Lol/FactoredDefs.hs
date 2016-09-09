@@ -38,7 +38,7 @@ module Crypto.Lol.FactoredDefs
 -- * Data-level equivalents of reflections for 'Factored' data
 , valueF, totientF, radicalF, oddRadicalF, valueHatF
 -- * Number-theoretic laws
-, transDivides, gcdDivides, lcmDivides, lcm2Divides
+, transDivides, gcdDivides, lcmDivides, lcm2Divides, coerceMul, coerceMulID
 , pSplitTheorems, pFreeDivides
 , (\\) -- re-export from Data.Constraint for convenience
 -- * Utility operations on prime powers
@@ -46,6 +46,7 @@ module Crypto.Lol.FactoredDefs
 , PP, ppToPP, valuePP, totientPP, radicalPP, oddRadicalPP, valueHatPP
 -- * Re-export
 , module Crypto.Lol.PosBin
+, Index(..)
 ) where
 
 import Crypto.Lol.PosBin
@@ -209,8 +210,16 @@ singletons [d|
 type a / b = FDiv a b
 
 -- | Type (family) synonym for multiplication of 'Factored' types.
-type a * b = FMul a b
-
+type family (a :: k1) * (b :: k2) :: k1 where
+  a * b = FMul a b
+  (a :: Factored) * (b :: PrimePower) = a * (PpToF b)
+  --(a :: PrimePower) * (b :: Prime) = ()
+{-
+type family a * b where -- (a :: k1) * (b :: k2) :: k3 where
+  F1 * a = a
+  a * F1 = a
+  (a :: Factored) * (b :: Factored) = FMul a b
+-}
 -- convenience aliases: enforce kind, hide SingI
 
 -- | Kind-restricted synonym for 'SingI'.
@@ -270,6 +279,24 @@ coerceFDivs _ _ = Sub $ unsafeCoerce (Dict :: Dict ())
 -- coerce any GCD we want
 coerceGCD :: p a -> p' a' -> p'' a'' -> (() :- (FGCD a a' ~ a''))
 coerceGCD _ _ _ = Sub $ unsafeCoerce (Dict :: Dict ())
+
+
+
+coerceMul' :: p l -> p m -> p r -> p n -> (() :- ((l*m*r*n) ~ (l*m*(r*n)),
+                                                 (n*(l*m*r)) ~ (n*l*m*r)))
+coerceMul' _ _ _ _ = Sub $ unsafeCoerce (Dict :: Dict ())
+
+-- | Coerce associativity of multiplication
+coerceMul :: forall p l m r n .
+  p l -> p m -> p r -> p n -> ((Fact r, Fact n) :- ((l*m*r*n) ~ (l*m*(r*n)),
+                                                    (n*(l*m*r)) ~ (n*l*m*r),
+                                                    Fact (r*n)))
+coerceMul l m r n =
+  Sub $ withSingI (sFMul (sing :: SFactored r) (sing :: SFactored n))
+  Dict \\ coerceMul' l m r n
+
+coerceMulID :: p m -> (() :- ((F1 * m) ~ m, (m * F1) ~ m))
+coerceMulID _ = Sub $ unsafeCoerce (Dict :: Dict ())
 
 -- | Entails constraint for transitivity of division, i.e.
 -- if \( k \mid l \) and \( l \mid m \), then \( k \mid m \).
@@ -493,3 +520,6 @@ factorize' _ n = error $ "can't factorize non-positive n = " ++ show n
 -- pairs, in strictly increasing order by prime.
 factorize :: Int -> [(Int,Int)]
 factorize = map (head &&& length) . group . factorize' primes
+
+class Index m where
+  totient :: Tagged m Int
