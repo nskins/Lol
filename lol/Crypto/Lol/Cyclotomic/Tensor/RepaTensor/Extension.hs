@@ -8,6 +8,7 @@
 {-# LANGUAGE PolyKinds             #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
 
@@ -68,7 +69,7 @@ twaceCRT' = do
   gInv <- gInvCRT
   embed :: Arr m r -> Arr m' r <- embedCRT'
   (_, m'hatinv) <- proxyT crtInfo (Proxy::Proxy m')
-  let hatRatioInv = m'hatinv * fromIntegral (proxy valueHatFact (Proxy::Proxy m))
+  let hatRatioInv = m'hatinv * fromIntegral (valueHatFact @m)
       -- tweak = mhat * g' / (m'hat * g)
       tweak = (coerce $ \x -> force . RT.map (* hatRatioInv) . RT.zipWith (*) x) (embed gInv) g' :: Arr m' r
       indices = proxy extIndicesCRT (Proxy::Proxy '(m, m'))
@@ -137,11 +138,11 @@ crtSetDec' :: forall m m' fp .
               => Tagged m [Arr m' fp]
 crtSetDec' = return $
   let m'p = Proxy :: Proxy m'
-      p = proxy valuePrime (Proxy::Proxy (CharOf fp))
-      phi = proxy totientFact m'p
+      p = valuePrime @(CharOf fp)
+      phi = totientFact @m'
 
       d = proxy (order p) m'p
-      h :: Int = proxy valueHatFact m'p
+      h :: Int = valueHatFact @m'
       hinv = recip $ fromIntegral h
   in reify d $ \(_::Proxy d) ->
        let twCRTs' :: T.Kron (GF fp d)
@@ -166,8 +167,8 @@ extIndicesPowDec = do
 extIndicesCRT :: forall m m' . (m `Divides` m')
                  => Tagged '(m, m') (Array U DIM2 DIM1)
 extIndicesCRT =
-  let phi = proxy totientFact (Proxy::Proxy m)
-      phi' = proxy totientFact (Proxy::Proxy m')
+  let phi = totientFact @m
+      phi' = totientFact @m'
   in do
     idxs <- T.extIndicesCRT
     return $ fromUnboxed (Z :. phi :. phi' `div` phi) $ U.map (Z:.) idxs

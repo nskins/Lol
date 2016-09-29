@@ -259,7 +259,7 @@ ppKron :: forall pp r mon . (PPow pp, Monad mon)
 ppKron mat = tagT $ case (sing :: SPrimePower pp) of
   pp@(SPP (STuple2 sp _)) -> do
     (MC h w f) <- withWitnessT mat sp
-    let d = withWitness valuePPow pp `div` withWitness valuePrime sp
+    let d = (valuePPow @pp) `div` withWitness valuePrimeT sp
     return $ MC (h*d) w (f . (`mod` h))
 
 -- deeply embedded DSL for Kronecker products of matrices
@@ -294,9 +294,9 @@ twCRTs = fKron twCRTsPPow
 
 -- | The "tweaked" \(\CRT^*\) matrix (for prime powers):
 -- \(\CRT^* \cdot \text{diag}(\sigma(g_p))\).
-twCRTsPPow :: (PPow pp, CRTrans mon r) => TaggedT pp mon (KronC r)
+twCRTsPPow :: forall pp mon r . (PPow pp, CRTrans mon r) => TaggedT pp mon (KronC r)
 twCRTsPPow = do
-  phi    <- pureT totientPPow
+  let phi = totientPPow @pp
   iToZms <- pureT indexToZmsPPow
   jToPow <- pureT indexToPowPPow
   (wPow, _) <- crtInfo
@@ -308,12 +308,12 @@ gCRTPPow, gInvCRTPPow :: (PPow pp, CRTrans mon r) => TaggedT pp mon (KronC r)
 gCRTPPow = ppKron gCRTPrime
 gInvCRTPPow = ppKron gInvCRTPrime
 
-gCRTPrime, gInvCRTPrime :: (Prime p, CRTrans mon r) => TaggedT p mon (KronC r)
+gCRTPrime, gInvCRTPrime :: forall p mon r . (Prime p, CRTrans mon r) => TaggedT p mon (KronC r)
 
 -- | A \((p-1)\)-by-1 matrix of the CRT coefficients of \(g_p\), for
 -- \(p\)th cyclotomic.
 gCRTPrime = do
-  p <- pureT valuePrime
+  let p = valuePrime @p
   (wPow, _) <- crtInfo
   return $ MC (p-1) 1 $ if p == 2 then const $ const one
                         else (\i _ -> one - wPow (i+1))
@@ -321,7 +321,7 @@ gCRTPrime = do
 -- | A \((p-1)\)-by-1 matrix of the inverse CRT coefficients of \(g_p\),
 -- for the \(p\)th cyclotomic.
 gInvCRTPrime = do
-  p <- pureT valuePrime
+  let p = valuePrime @p
   (wPow, phatinv) <- crtInfo
   return $ MC (p-1) 1 $
     if p == 2 then const $ const one
@@ -338,13 +338,14 @@ digitRev (p,e) j
   | e >= 1 = let (q,r) = j `divMod` p
              in r * (p^(e-1)) + digitRev (p,e-1) q
 
-indexToPowPPow, indexToZmsPPow :: PPow pp => Tagged pp (Int -> Int)
-indexToPowPPow = indexToPow <$> ppPPow
-indexToZmsPPow = indexToZms <$> ppPPow
+indexToPowPPow, indexToZmsPPow :: forall pp . PPow pp => Tagged pp (Int -> Int)
+indexToPowPPow = tag $ indexToPow $ ppPPow @pp
+indexToZmsPPow = tag $ indexToZms $ ppPPow @pp
 
 -- | Convert a \(\Z_m^*\) index to a linear tensor index in \([m]\).
-zmsToIndexFact :: Fact m => Tagged m (Int -> Int)
-zmsToIndexFact = zmsToIndex <$> ppsFact
+-- EAC: of course this could be made not tagged as well
+zmsToIndexFact :: forall m . Fact m => Tagged m (Int -> Int)
+zmsToIndexFact = tag $ zmsToIndex $ ppsFact @m
 
 -- | For a prime power \(p^e\), map a tensor index to the corresponding
 -- power \(j \in [\varphi(p^e)]\), as in the powerful basis.
@@ -404,11 +405,11 @@ fromIndexPair ((phi,phi'):rest) (i1,i0) =
 -- triple in the first component.
 indexInfo :: forall m m' . (m `Divides` m')
              => Tagged '(m, m') ([(Int,Int,Int)], Int, Int, [(Int,Int)])
-indexInfo = let pps = untag $ ppsFact @m
-                pps' = untag $ ppsFact @m'
+indexInfo = let pps = ppsFact @m
+                pps' = ppsFact @m'
                 mpps = mergePPs pps pps'
-                phi = untag $ totientFact @m
-                phi' = untag $ totientFact @m'
+                phi =  totientFact @m
+                phi' = totientFact @m'
                 tots = totients mpps
             in tag (mpps, phi, phi', tots)
 

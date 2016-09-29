@@ -1,5 +1,5 @@
 {-# LANGUAGE ConstraintKinds, FlexibleContexts,
-             RebindableSyntax, ScopedTypeVariables #-}
+             RebindableSyntax, ScopedTypeVariables, TypeApplications #-}
 
 -- | Linear transforms and operations related to the decoding basis.
 
@@ -19,10 +19,9 @@ tGaussianDec' :: forall m v r rnd .
                   ToRational v, MonadRandom rnd)
                  => v -> rnd (Arr m r)
 tGaussianDec' =
-  let pm = Proxy::Proxy m
-      m = proxy valueFact pm
-      n = proxy totientFact pm
-      rad = proxy radicalFact pm
+  let m = valueFact @m
+      n = totientFact @m
+      rad = radicalFact @m
   in \v -> do             -- rnd monad
     x <- realGaussians (v * fromIntegral (m `div` rad)) n
     let arr = Arr $ fromUnboxed (Z:.n) x
@@ -35,7 +34,7 @@ fE = eval $ fTensor $ ppTensor pE
 -- | The @E_p@ transformation for a prime @p@.
 pE :: forall p r . (Prime p, Transcendental r, Unbox r, Elt r)
       => Tagged p (Trans r)
-pE = let pval = proxy valuePrime (Proxy::Proxy p)
+pE = let pval = valuePrime @p
      in tag $ if pval==2 then Id 1
               else trans (pval-1) $ mulMat $ force $
                    fromFunction (Z :. pval-1 :. pval-1)
@@ -64,7 +63,7 @@ fGramDec' = eval $ fTensor $ ppTensor pGramDec
 -- | Multiply by (scaled) Gram matrix of decoding basis: (I_{p-1} + all-1s).
 pGramDec :: forall p r . (Prime p, Ring r, Unbox r, Elt r) => Tagged p (Trans r)
 pGramDec =
-  let pval = proxy valuePrime (Proxy::Proxy p)
+  let pval = valuePrime @p
   in tag $ if pval==2 then Id 1
            else trans (pval-1) $
                     \arr -> let sums = sumS arr

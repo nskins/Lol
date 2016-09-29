@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, FlexibleContexts, FlexibleInstances,
              KindSignatures, MultiParamTypeClasses, NoImplicitPrelude,
-             PolyKinds, ScopedTypeVariables, UndecidableInstances #-}
+             PolyKinds, ScopedTypeVariables, TypeApplications, UndecidableInstances #-}
 
 -- | Generic interface for reflecting types to values.
 
@@ -42,13 +42,13 @@ instance (BinC a, ToInteger.C i) => Reflects a i where
 -}
 
 instance (Prime p, ToInteger.C i) => Reflects p i where
-  value = fromIntegral <$> valuePrime
+  value = tag $ fromIntegral $ valuePrime @p
 
 instance (PPow pp, ToInteger.C i) => Reflects pp i where
-  value = fromIntegral <$> valuePPow
+  value = tag $ fromIntegral $ valuePPow @pp
 
 instance (Fact m, ToInteger.C i) => Reflects m i where
-  value = fromIntegral <$> valueFact
+  value = tag $ fromIntegral $ valueFact @m
 
 instance (Reifies q i, ToInteger.C i, Ring.C r)
   => Reflects (q :: *) r where

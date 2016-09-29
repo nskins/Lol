@@ -2,7 +2,7 @@
              FlexibleInstances, GeneralizedNewtypeDeriving,
              MultiParamTypeClasses, PolyKinds,
              RebindableSyntax, RoleAnnotations, ScopedTypeVariables,
-             TypeFamilies, UndecidableInstances #-}
+             TypeApplications, TypeFamilies, UndecidableInstances #-}
 
 -- | \( \def\Z{\mathbb{Z}} \)
 --   \( \def\C{\mathbb{C}} \)
@@ -98,7 +98,7 @@ instance (PPow pp, zq ~ ZqBasic pp z,
 
   type ZpOf (ZqBasic pp z) = ZqBasic (PrimePP pp) z
 
-  modulusZPP = retag (ppPPow :: Tagged pp PP)
+  modulusZPP = tag $ ppPPow @pp
   liftZp = coerce
 
 instance (Reflects q z, ToInteger z) => Reduce z (ZqBasic q z) where

@@ -1,6 +1,6 @@
 {-# LANGUAGE BangPatterns, ConstraintKinds, FlexibleContexts, GADTs,
              MultiParamTypeClasses, RankNTypes,
-             RebindableSyntax, ScopedTypeVariables #-}
+             RebindableSyntax, ScopedTypeVariables, TypeApplications #-}
 
 -- | The @G@ and @L@ transforms for Repa arrays.
 
@@ -52,7 +52,7 @@ wrapGInv' :: forall m r .
   -> Arr m r -> Maybe (Arr m r)
 wrapGInv' ginv =
   let fGInv = eval $ fTensor $ ppTensor ginv
-      oddrad = fromIntegral $ proxy oddRadicalFact (Proxy::Proxy m)
+      oddrad = fromIntegral $ oddRadicalFact @m
   in (`divCheck` oddrad) . fGInv
 {-# INLINABLE wrapGInv' #-}
 
@@ -70,7 +70,7 @@ divCheck = coerce $  \ !arr den ->
 pWrap :: forall p r . Prime p
          => (forall rep . Source rep r => Int -> Array rep DIM2 r -> Array D DIM2 r)
          -> Tagged p (Trans r)
-pWrap f = let pval = proxy valuePrime (Proxy::Proxy p)
+pWrap f = let pval = valuePrime @p
               -- special case: return identity function for p=2
           in return $ if pval > 2
                       then trans  (pval-1) $ f pval

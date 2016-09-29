@@ -2,7 +2,7 @@
              FlexibleInstances, GADTs, GeneralizedNewtypeDeriving,
              KindSignatures, MultiParamTypeClasses,
              RankNTypes, RebindableSyntax, RoleAnnotations,
-             ScopedTypeVariables, TypeOperators #-}
+             ScopedTypeVariables, TypeApplications, TypeOperators #-}
 
 -- | A simple DSL for tensoring Repa arrays and other common functionality
 -- on Repa arrays
@@ -54,14 +54,14 @@ type role Arr nominal nominal
 
 -- | An 'Arr' filled with the argument.
 repl :: forall m r . (Fact m, Unbox r) => r -> Arr m r
-repl = let n = proxy totientFact (Proxy::Proxy m)
+repl = let n = totientFact @m
        in Arr . fromUnboxed (Z:.n) . U.replicate n
 {-# INLINABLE repl #-}
 
 -- | Monadic version of 'repl'.
 replM :: forall m r mon . (Fact m, Unbox r, Monad mon)
          => mon r -> mon (Arr m r)
-replM = let n = proxy totientFact (Proxy::Proxy m)
+replM = let n = totientFact @m
         in fmap (Arr . fromUnboxed (Z:.n)) . U.replicateM n
 {-# INLINABLE replM #-}
 
@@ -126,12 +126,11 @@ ppTensor :: forall pp r mon . (PPow pp, Monad mon)
             -> TaggedT pp mon (Trans r)
 
 ppTensor func = tagT $ case (sing :: SPrimePower pp) of
-  pp@(SPP (STuple2 sp _)) -> do
+  (SPP (STuple2 sp _)) -> do
     func' <- withWitnessT func sp
-    let lts = withWitness valuePPow pp `div` withWitness valuePrime sp
+    let lts = (valuePPow @pp) `div` (withWitness valuePrimeT sp) -- EAC: can't figure out how to do this with TA yet
     return $ Id lts @* func'
 {-# INLINABLE ppTensor #-}
-
 
 -- deeply embedded DSL for transformations and their various
 -- compositions
@@ -244,7 +243,7 @@ mulDiag !diag !arr = fromFunction (extent arr) f
 -- | Embeds a scalar into a powerful-basis representation of a Repa array,
 -- tagged by the cyclotomic index
 scalarPow' :: forall m r . (Fact m, Additive r, Unbox r) => r -> Arr m r
-scalarPow' = coerce . go (proxy totientFact (Proxy::Proxy m))
+scalarPow' = coerce . go (totientFact @m)
   where go n !r = let fct (Z:.0) = r
                       fct _ = LP.zero
                   in force $ fromFunction (Z:.n) fct

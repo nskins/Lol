@@ -1,7 +1,7 @@
 {-# LANGUAGE ConstraintKinds, DataKinds, DeriveTraversable,
              FlexibleContexts, GeneralizedNewtypeDeriving, KindSignatures,
              MultiParamTypeClasses, RoleAnnotations, ScopedTypeVariables,
-             TypeFamilies, UndecidableInstances #-}
+             TypeApplications, TypeFamilies, UndecidableInstances #-}
 
 -- | Provides applicative-like functions for indexed vectors
 
@@ -14,8 +14,6 @@ import Crypto.Lol.Factored
 import Algebra.ZeroTestable as ZeroTestable
 
 import Control.DeepSeq
-import Data.Data
-import Data.Functor.Trans.Tagged
 
 import Data.Vector as V
 
@@ -38,7 +36,7 @@ type role IZipVector representational representational
 -- | Smart constructor that checks whether length of input is right
 -- (should be totient of @m@).
 iZipVector :: forall m a . (Fact m) => Vector a -> Maybe (IZipVector m a)
-iZipVector = let n = proxy totientFact (Proxy::Proxy m)
+iZipVector = let n = totientFact @m
             in \vec -> if n == V.length vec
                        then Just $ IZipVector vec
                        else Nothing
@@ -50,7 +48,7 @@ unzipIZV (IZipVector v) = let (va,vb) = V.unzip v
 
 -- don't export
 repl :: forall m a . (Fact m) => a -> IZipVector m a
-repl = let n = proxy totientFact (Proxy::Proxy m)
+repl = let n = totientFact @m
        in IZipVector . V.replicate n
 
 -- Zip-py 'Applicative' instance.

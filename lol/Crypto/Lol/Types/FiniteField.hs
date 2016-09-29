@@ -8,6 +8,7 @@
 {-# LANGUAGE RebindableSyntax           #-}
 {-# LANGUAGE RoleAnnotations            #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE UndecidableInstances       #-}
 
@@ -146,7 +147,7 @@ fromList = let dval = proxy value (Proxy::Proxy d)
                               show (length cs) ++ " > degree " ++ show dval
 
 sizePP :: forall fp d . (GFCtx fp d) => Tagged (GF fp d) PP
-sizePP = tag (proxy valuePrime (Proxy::Proxy (CharOf fp)),
+sizePP = tag (valuePrime @(CharOf fp),
               proxy value (Proxy::Proxy d))
 
 -- | The order of the field: @size (GF fp d) = @\( p^d \)

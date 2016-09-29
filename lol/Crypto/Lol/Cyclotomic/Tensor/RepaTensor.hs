@@ -58,16 +58,16 @@ instance (Fact m, Reflects q Int64) => Protoable (RT m (ZqBasic q Int64)) where
   type ProtoType (RT m (ZqBasic q Int64)) = Rq
 
   toProto (RT (Arr xs')) =
-    let m = fromIntegral $ valueFact' @m
+    let m = fromIntegral $ valueFact @m
         q = fromIntegral (untag $ value @q :: Int64)
         xs = S.fromList $ RT.toList $ RT.map lift xs'
     in Rq{..}
   toProto x@(ZV _) = toProto $ toRT x
 
   fromProto Rq{..} =
-    let m' = untag $ valueFact @m :: Int
+    let m' = valueFact @m :: Int
         q' = untag $ value @q :: Int64
-        n = untag $ totientFact @m
+        n = totientFact @m
         xs' = RT.fromList (Z:.n) $ LP.map reduce $ F.toList xs
         len = F.length xs
     in if m' == fromIntegral m && len == n && fromIntegral q' == q
@@ -82,16 +82,16 @@ instance (Fact m, Reflects q Double) => Protoable (RT m (RRq q Double)) where
   type ProtoType (RT m (RRq q Double)) = Kq
 
   toProto (RT (Arr xs')) =
-    let m = fromIntegral $ untag $ valueFact @m
+    let m = fromIntegral $ valueFact @m
         q = round (untag $ value @q :: Double)
         xs = S.fromList $ RT.toList $ RT.map lift xs'
     in Kq{..}
   toProto x@(ZV _) = toProto $ toRT x
 
   fromProto Kq{..} =
-    let m' = untag $ valueFact @m :: Int
+    let m' = valueFact @m :: Int
         q' = round (untag $ value @q :: Double)
-        n = untag $ totientFact @m
+        n = totientFact @m
         xs' = RT.fromList (Z:.n) $ LP.map reduce $ F.toList xs
         len = F.length xs
     in if m' == fromIntegral m && len == n && q' == q

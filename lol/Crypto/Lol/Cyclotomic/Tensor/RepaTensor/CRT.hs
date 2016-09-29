@@ -4,6 +4,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoImplicitPrelude     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeApplications      #-}
 
 -- | Functions to support the chinese remainder transform on Repa arrays
 
@@ -28,7 +29,7 @@ scalarCRT' :: forall mon m r . (Fact m, CRTrans mon r, Unbox r)
               => mon (r -> Arr m r)
 {-# INLINABLE scalarCRT' #-}
 scalarCRT'
-  = let n = proxy totientFact (Proxy::Proxy m)
+  = let n = totientFact @m
         sz = Z :. n
     in pure $ Arr . force . fromFunction sz . const
 
@@ -47,7 +48,7 @@ wrapVector :: forall mon m r . (Monad mon, Fact m, Ring r, Unbox r)
               => TaggedT m mon (Kron r) -> mon (Arr m r)
 wrapVector v = do
   vmat <- proxyT v (Proxy::Proxy m)
-  let n = proxy totientFact (Proxy::Proxy m)
+  let n = totientFact @m
   return $ coerce $ force $ RT.fromFunction (Z:.n)
     (\(Z:.i) -> indexK vmat i 0)
 
@@ -76,7 +77,7 @@ fCRT = evalM $ fTensor ppCRT
 -- Exists if and only if CRT exists for all prime powers.
 fCRTInv = do
   (_, mhatInv) :: (CRTInfo r) <- proxyT crtInfo (Proxy :: Proxy m)
-  let totm = proxy totientFact (Proxy :: Proxy m)
+  let totm = totientFact @m
       divMhat = trans totm $ RT.map (*mhatInv)
   evalM $ (divMhat .*) <$> fTensor ppCRTInv'
 
@@ -154,7 +155,7 @@ pDFT, pDFTInv', pCRT, pCRTInv' ::
 {-# INLINABLE pCRT #-}
 {-# INLINABLE pCRTInv' #-}
 
-pDFT = let pval = proxy valuePrime (Proxy::Proxy p)
+pDFT = let pval = valuePrime @p
        in if pval == 2
           then return butterfly
           else do (omegaPPow, _) <- crtInfo
@@ -162,7 +163,7 @@ pDFT = let pval = proxy valuePrime (Proxy::Proxy p)
                          fromFunction (Z :. pval :. pval)
                                           (\(Z:.i:.j) -> omegaPPow (i*j))
 
-pDFTInv' = let pval = proxy valuePrime (Proxy::Proxy p)
+pDFTInv' = let pval = valuePrime @p
            in if pval == 2
               then return butterfly
               else do (omegaPPow, _) <- crtInfo
@@ -170,7 +171,7 @@ pDFTInv' = let pval = proxy valuePrime (Proxy::Proxy p)
                              fromFunction (Z :. pval :. pval)
                                               (\(Z:.i:.j) -> omegaPPow (-i*j))
 
-pCRT = let pval = proxy valuePrime (Proxy::Proxy p)
+pCRT = let pval = valuePrime @p
        in if pval == 2
           then return $ Id 1
           else do (omegaPPow, _) <- crtInfo
@@ -180,7 +181,7 @@ pCRT = let pval = proxy valuePrime (Proxy::Proxy p)
 
 -- crt_p * this = \hat{p}*I, for all prime p.
 pCRTInv' =
-  let pval = proxy valuePrime (Proxy::Proxy p)
+  let pval = valuePrime @p
   in if pval == 2 then return $ Id 1
      else do
        (omegaPPow, _) <- crtInfo
@@ -198,7 +199,7 @@ ppTwid, ppTwidHat ::
 {-# INLINABLE ppTwidHat #-}
 
 ppTwid inv =
-  let pp@(p,e) = proxy ppPPow (Proxy :: Proxy pp)
+  let pp@(p,e) = ppPPow @pp
       ppval = valuePP pp
   in do
     (omegaPPPow, _) <- crtInfo
@@ -210,7 +211,7 @@ ppTwid inv =
                                        in omegaPPPow pow)
 
 ppTwidHat inv =
-  let pp@(p,e) = proxy ppPPow (Proxy :: Proxy pp)
+  let pp@(p,e) = ppPPow @pp
       pptot = totientPP pp
   in do
     (omegaPPPow, _) <- crtInfo

@@ -5,6 +5,7 @@
 {-# LANGUAGE PolyKinds             #-}
 {-# LANGUAGE RebindableSyntax      #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
 
@@ -93,7 +94,7 @@ kronToVec :: forall mon m r . (Monad mon, Fact m, Ring r, Storable r)
   => TaggedT m mon (Kron r) -> TaggedT m mon (Vector r)
 kronToVec v = do
   vmat <- v
-  let n = proxy totientFact (Proxy::Proxy m)
+  let n = totientFact @m
   return $ generate n (flip (indexK vmat) 0)
 
 twaceCRT' :: forall mon m m' r .
@@ -106,9 +107,9 @@ twaceCRT' = tagT $ do
   embed <- proxyT embedCRT' (Proxy::Proxy '(m,m'))
   indices <- pure $ proxy extIndicesCRT (Proxy::Proxy '(m,m'))
   (_, m'hatinv) <- proxyT crtInfo (Proxy::Proxy m')
-  let phi = proxy totientFact (Proxy::Proxy m)
-      phi' = proxy totientFact (Proxy::Proxy m')
-      mhat = fromIntegral $ proxy valueHatFact (Proxy::Proxy m)
+  let phi = totientFact @m
+      phi' = totientFact @m'
+      mhat = fromIntegral $ valueHatFact @m
       hatRatioInv = m'hatinv * mhat
       reltot = phi' `div` phi
       -- tweak = mhat * g' / (m'hat * g)
@@ -136,10 +137,10 @@ crtSetDec' :: forall m m' fp .
   => Tagged '(m, m') [SV.Vector fp]
 crtSetDec' =
   let m'p = Proxy :: Proxy m'
-      p = proxy valuePrime (Proxy::Proxy (CharOf fp))
-      phi = proxy totientFact m'p
+      p = valuePrime @(CharOf fp)
+      phi = totientFact @m'
       d = proxy (order p) m'p
-      h :: Int = proxy valueHatFact m'p
+      h :: Int = valueHatFact @m'
       hinv = recip $ fromIntegral h
   in reify d $ \(_::Proxy d) -> do
       let twCRTs' :: Kron (GF fp d)
