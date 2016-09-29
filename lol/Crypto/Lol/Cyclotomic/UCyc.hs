@@ -9,6 +9,7 @@
 {-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE RebindableSyntax      #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE UndecidableInstances  #-}
@@ -538,15 +539,12 @@ crtSet =
   --DT.trace ("UCyc.crtSet: m = " ++
   --          show (proxy valueFact (Proxy::Proxy m)) ++ ", m'= " ++
   --          show (proxy valueFact (Proxy::Proxy m'))) $
-  let (p,e) = proxy modulusZPP (Proxy::Proxy r)
-      pp = Proxy::Proxy p
-      pm = Proxy::Proxy m
-      pm' = Proxy::Proxy m'
+  let (p,e) = untag (modulusZPP @r)
   in retag (fmap (embedPow .
                   (if e > 1 then toPowCE . (^(p^(e-1))) . toCRT else toPow) .
                   Dec . fmapT liftZp) <$>
             (crtSetDec :: Tagged mbar [t m'bar (ZpOf r)]))
-     \\ pFreeDivides pp pm pm' \\ pSplitTheorems pp pm \\ pSplitTheorems pp pm'
+     \\ pFreeDivides @p @m @m' \\ pSplitTheorems @p @m \\ pSplitTheorems @p @m'
 
 
 --------- Conversion methods ------------------

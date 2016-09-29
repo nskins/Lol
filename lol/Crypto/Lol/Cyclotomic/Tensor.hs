@@ -8,6 +8,7 @@
 {-# LANGUAGE RankNTypes              #-}
 {-# LANGUAGE ScopedTypeVariables     #-}
 {-# LANGUAGE TupleSections           #-}
+{-# LANGUAGE TypeApplications        #-}
 {-# LANGUAGE TypeFamilies            #-}
 {-# LANGUAGE TypeOperators           #-}
 {-# LANGUAGE UndecidableInstances    #-}
@@ -184,7 +185,7 @@ class (TElt t Double, TElt t (Complex Double)) => Tensor t where
             => t m (a,b) -> (t m a, t m b)
 
 -- | Convenience value indicating whether 'crtFuncs' exists.
-hasCRTFuncs :: forall t m mon r . (CRTrans mon r, Tensor t, Fact m, TElt t r)
+hasCRTFuncs :: forall t m r mon . (CRTrans mon r, Tensor t, Fact m, TElt t r)
                => TaggedT (t m r) mon ()
 {-# INLINABLE hasCRTFuncs #-}
 hasCRTFuncs = tagT $ do
@@ -224,8 +225,8 @@ crtInv = (\(_,_,_,_,f) -> f) <$> crtFuncs
 twaceCRT :: forall t m m' mon r . (CRTrans mon r, Tensor t, m `Divides` m', TElt t r)
             => mon (t m' r -> t m r)
 {-# INLINABLE twaceCRT #-}
-twaceCRT = proxyT hasCRTFuncs (Proxy::Proxy (t m' r)) *>
-           proxyT hasCRTFuncs (Proxy::Proxy (t m  r)) *>
+twaceCRT = untagT (hasCRTFuncs @t @m' @r) *>
+           untagT (hasCRTFuncs @t @m  @r) *>
            (fst <$> crtExtFuncs)
 
 -- | Embed a tensor with index \(m\) in the CRT basis to a tensor with
@@ -233,8 +234,8 @@ twaceCRT = proxyT hasCRTFuncs (Proxy::Proxy (t m' r)) *>
 -- (This function is simply an appropriate entry from 'crtExtFuncs'.)
 embedCRT :: forall t m m' mon r . (CRTrans mon r, Tensor t, m `Divides` m', TElt t r)
             => mon (t m r -> t m' r)
-embedCRT = proxyT hasCRTFuncs (Proxy::Proxy (t m' r)) *>
-           proxyT hasCRTFuncs (Proxy::Proxy (t m  r)) *>
+embedCRT = untagT (hasCRTFuncs @t @m' @r) *>
+           untagT (hasCRTFuncs @t @m  @r) *>
            (snd <$> crtExtFuncs)
 
 fKron :: forall m r mon . (Fact m, Monad mon)
@@ -403,11 +404,11 @@ fromIndexPair ((phi,phi'):rest) (i1,i0) =
 -- triple in the first component.
 indexInfo :: forall m m' . (m `Divides` m')
              => Tagged '(m, m') ([(Int,Int,Int)], Int, Int, [(Int,Int)])
-indexInfo = let pps = proxy ppsFact (Proxy::Proxy m)
-                pps' = proxy ppsFact (Proxy::Proxy m')
+indexInfo = let pps = untag $ ppsFact @m
+                pps' = untag $ ppsFact @m'
                 mpps = mergePPs pps pps'
-                phi = proxy totientFact (Proxy::Proxy m)
-                phi' = proxy totientFact (Proxy::Proxy m')
+                phi = untag $ totientFact @m
+                phi' = untag $ totientFact @m'
                 tots = totients mpps
             in tag (mpps, phi, phi', tots)
 

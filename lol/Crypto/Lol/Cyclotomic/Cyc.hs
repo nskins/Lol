@@ -8,6 +8,7 @@
 {-# LANGUAGE PolyKinds             #-}
 {-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE UndecidableInstances  #-}
@@ -180,7 +181,7 @@ instance (Eq r, Fact m, CElt t r) => Eq (Cyc t m r) where
   -- EAC: would like to convert c2 to basis of c1 before embedding
   (Sub (c1 :: Cyc t l1 r)) == (Sub (c2 :: Cyc t l2 r)) =
     (embed' c1 :: Cyc t (FLCM l1 l2) r) == embed' c2
-    \\ lcmDivides (Proxy::Proxy l1) (Proxy::Proxy l2)
+    \\ lcmDivides @l1 @l2
 
   -- some other relatively efficient comparisons
   (Scalar c1) == (Pow u2) = scalarPow c1 == u2
@@ -209,7 +210,7 @@ instance (Fact m, CElt t r) => Additive.C (Cyc t m r) where
   -- EAC: would like to convert c2 to basis of c1 before embedding
   (Sub (c1 :: Cyc t m1 r)) + (Sub (c2 :: Cyc t m2 r)) =
     (Sub $ (embed' c1 :: Cyc t (FLCM m1 m2) r) + embed' c2)
-    \\ lcm2Divides (Proxy::Proxy m1) (Proxy::Proxy m2) (Proxy::Proxy m)
+    \\ lcm2Divides @m1 @m2 @m
 
   -- SCALAR PLUS SOMETHING ELSE
 
@@ -277,7 +278,7 @@ instance (Fact m, CElt t r) => Ring.C (Cyc t m r) where
   (Sub (c1 :: Cyc t m1 r)) * (Sub (c2 :: Cyc t m2 r)) =
     -- re-wrap c1, c2 as Subs of the composition, and force them to CRT
     (Sub $ (toCRT' $ Sub c1 :: Cyc t (FLCM m1 m2) r) * toCRT' (Sub c2))
-    \\ lcm2Divides (Proxy::Proxy m1) (Proxy::Proxy m2) (Proxy::Proxy m)
+    \\ lcm2Divides @m1 @m2 @m
 
   -- ELSE: work in appropriate CRT rep
   c1 * c2 = toCRT' c1 * toCRT' c2
@@ -386,7 +387,7 @@ embed :: forall t m m' r . (m `Divides` m') => Cyc t m r -> Cyc t m' r
 {-# INLINABLE embed #-}
 embed (Scalar c) = Scalar c           -- keep as scalar
 embed (Sub (c :: Cyc t l r)) = Sub c  -- keep as subring element
-  \\ transDivides (Proxy::Proxy l) (Proxy::Proxy m) (Proxy::Proxy m')
+  \\ transDivides @l @m @m'
 embed c = Sub c
 
 -- | Force to a non-'Sub' constructor (for internal use only).
@@ -397,7 +398,7 @@ embed' (Dec u) = Dec $ embedDec u
 embed' (CRT u) = either (cycPE . embedCRTE) (cycPC . embedCRTC) u
 embed' (Scalar c) = Scalar c
 embed' (Sub (c :: Cyc t k r)) = embed' c
-  \\ transDivides (Proxy::Proxy k) (Proxy::Proxy l) (Proxy::Proxy m)
+  \\ transDivides @k @l @m
 
 -- | The "tweaked trace" (twace) function
 -- \(\Tw(x) = (\hat{m} / \hat{m}') \cdot \Tr((g' / g) \cdot x)\),
@@ -410,7 +411,7 @@ twace (Dec u) = Dec $ U.twaceDec u
 twace (CRT u) = either (cycPE . twaceCRTE) (cycPC . twaceCRTC) u
 twace (Scalar u) = Scalar u
 twace (Sub (c :: Cyc t l r)) = Sub (twace c :: Cyc t (FGCD l m) r)
-                               \\ gcdDivides (Proxy::Proxy l) (Proxy::Proxy m)
+                               \\ gcdDivides @l @m
 
 -- | Return the given element's coefficient vector with respect to
 -- the (relative) powerful/decoding basis of the cyclotomic

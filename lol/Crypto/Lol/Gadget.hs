@@ -7,6 +7,7 @@
 {-# LANGUAGE PolyKinds             #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TupleSections         #-}
+{-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
@@ -65,7 +66,7 @@ decomposeList = fmap concat . traverse decompose
 decomposeMatrix :: forall gad u . (Decompose gad u)
                    => Matrix u -> Tagged gad (Matrix (DecompOf u))
 decomposeMatrix m = do
-  l <- length <$> (gadget :: Tagged gad [u]) -- CJP: avoid scoped type vars?
+  l <- length <$> (gadget @_ @u) -- CJP: avoid scoped type vars?
   fromColumns (l * numRows m) (numColumns m) <$>
     traverse decomposeList (columns m)
 
@@ -96,11 +97,10 @@ instance (Correct gad a, Correct gad b,
     => Correct gad (a,b) where
 
   correct =
-    let gada = gadget :: Tagged gad [a]
-        gadb = gadget :: Tagged gad [b]
+    let gada = gadget @gad @a
         ka = length gada
-        qaval = toInteger $ proxy modulus (Proxy::Proxy a)
-        qbval = toInteger $ proxy modulus (Proxy::Proxy b)
+        qaval = toInteger $ untag $ modulus @a
+        qbval = toInteger $ untag $ modulus @b
         qamod = fromIntegral qaval
         qbmod = fromIntegral qbval
         qainv = recip qamod
@@ -116,10 +116,10 @@ instance (Correct gad a, Correct gad b,
                                  in (qainv * (b - fromIntegral x), x)) <$> wb
             (sa,ea) = (qbmod *) ***
                       zipWith (\x e -> x + qbval * toInteger e) xb $
-                      correct (tag va `asTypeOf` gada)
+                      correct @gad $ tag va
             (sb,eb) = (qamod *) ***
                       zipWith (\x e -> x + qaval * toInteger e) xa $
-                      correct (tag vb `asTypeOf` gadb)
+                      correct @gad $ tag vb
         in ((sa,sb), ea ++ eb)
 
 

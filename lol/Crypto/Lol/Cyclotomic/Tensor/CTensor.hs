@@ -14,6 +14,7 @@
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE StandaloneDeriving         #-}
 {-# LANGUAGE TupleSections              #-}
+{-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE UndecidableInstances       #-}
@@ -102,16 +103,16 @@ instance (Fact m, Reflects q Int64) => Protoable (CT m (ZqBasic q Int64)) where
   type ProtoType (CT m (ZqBasic q Int64)) = Rq
 
   toProto (CT (CT' xs')) =
-    let m = fromIntegral $ proxy valueFact (Proxy::Proxy m)
-        q = fromIntegral (proxy value (Proxy::Proxy q) :: Int64)
+    let m = fromIntegral $ untag $ valueFact @m
+        q = fromIntegral (untag $ value @q :: Int64)
         xs = S.fromList $ SV.toList $ SV.map LP.lift xs'
     in Rq{..}
   toProto x@(ZV _) = toProto $ toCT x
 
   fromProto Rq{..} =
-    let m' = proxy valueFact (Proxy::Proxy m) :: Int
-        q' = proxy value (Proxy::Proxy q) :: Int64
-        n = proxy totientFact (Proxy::Proxy m)
+    let m' = untag $ valueFact @m :: Int
+        q' = untag $ value @q :: Int64
+        n = untag $ totientFact @m
         xs' = SV.fromList $ F.toList xs
         len = F.length xs
     in if m' == fromIntegral m && len == n && fromIntegral q' == q
@@ -126,16 +127,16 @@ instance (Fact m, Reflects q Double) => Protoable (CT m (RRq q Double)) where
   type ProtoType (CT m (RRq q Double)) = Kq
 
   toProto (CT (CT' xs')) =
-    let m = fromIntegral $ proxy valueFact (Proxy::Proxy m)
-        q = round (proxy value (Proxy::Proxy q) :: Double)
+    let m = fromIntegral $ untag $ valueFact @m
+        q = round (untag $ value @q :: Double)
         xs = S.fromList $ SV.toList $ SV.map LP.lift xs'
     in Kq{..}
   toProto x@(ZV _) = toProto $ toCT x
 
   fromProto Kq{..} =
-    let m' = proxy valueFact (Proxy::Proxy m) :: Int
-        q' = round (proxy value (Proxy::Proxy q) :: Double)
-        n = proxy totientFact (Proxy::Proxy m)
+    let m' = untag $ valueFact @m :: Int
+        q' = round (untag $ value @q :: Double)
+        n = untag $ totientFact @m
         xs' = SV.fromList $ F.toList xs
         len = F.length xs
     in if m' == fromIntegral m && len == n && q' == q
@@ -343,8 +344,8 @@ dispatchGInv :: forall m r . (Storable r, Fact m)
              => (Ptr r -> Int64 -> Ptr CPP -> Int16 -> IO Int16)
                  -> CT' m r -> Maybe (CT' m r)
 dispatchGInv f =
-  let factors = proxy (marshalFactors <$> ppsFact) (Proxy::Proxy m)
-      totm = proxy (fromIntegral <$> totientFact) (Proxy::Proxy m)
+  let factors = untag $ (marshalFactors <$> ppsFact @m)
+      totm = untag $ (fromIntegral <$> totientFact @m)
       numFacts = fromIntegral $ SV.length factors
   in \(CT' x) -> unsafePerformIO $ do
     yout <- SV.thaw x
@@ -359,8 +360,8 @@ withBasicArgs :: forall m r . (Fact m, Storable r)
   => (Ptr r -> Int64 -> Ptr CPP -> Int16 -> IO ())
      -> CT' m r -> IO (CT' m r)
 withBasicArgs f =
-  let factors = proxy (marshalFactors <$> ppsFact) (Proxy::Proxy m)
-      totm = proxy (fromIntegral <$> totientFact) (Proxy::Proxy m)
+  let factors = untag $ (marshalFactors <$> ppsFact @m)
+      totm = untag $ (fromIntegral <$> totientFact @m)
       numFacts = fromIntegral $ SV.length factors
   in \(CT' x) -> do
     yout <- SV.thaw x
@@ -445,18 +446,18 @@ instance (NFData r) => NFData (CT m r) where
   rnf (ZV v) = rnf v
 
 repl :: forall m r . (Fact m, Storable r) => r -> CT' m r
-repl = let n = proxy totientFact (Proxy::Proxy m)
+repl = let n = untag $ totientFact @m
        in coerce . SV.replicate n
 
 replM :: forall m r mon . (Fact m, Storable r, Monad mon)
          => mon r -> mon (CT' m r)
-replM = let n = proxy totientFact (Proxy::Proxy m)
+replM = let n = untag $ totientFact @m
         in fmap coerce . SV.replicateM n
 
 scalarPow' :: forall m r . (Fact m, Additive r, Storable r) => r -> CT' m r
 -- constant-term coefficient is first entry wrt powerful basis
 scalarPow' =
-  let n = proxy totientFact (Proxy::Proxy m)
+  let n = untag $ totientFact @m
   in \r -> CT' $ generate n (\i -> if i == 0 then r else zero)
 
 ru, ruInv :: (CRTrans mon r, Fact m, Storable r)
@@ -484,8 +485,8 @@ ruInv = do
 wrapVector :: forall mon m r . (Monad mon, Fact m, Ring r, Storable r)
   => TaggedT m mon (Kron r) -> mon (CT' m r)
 wrapVector v = do
-  vmat <- proxyT v (Proxy::Proxy m)
-  let n = proxy totientFact (Proxy::Proxy m)
+  vmat <- proxyT v (Proxy::Proxy m) -- EAC: couldn't get VTA working here.
+  let n = untag $ totientFact @m
   return $ CT' $ generate n (flip (indexK vmat) 0)
 
 gCRT, gInvCRT :: (Storable r, CRTrans mon r, Fact m)
