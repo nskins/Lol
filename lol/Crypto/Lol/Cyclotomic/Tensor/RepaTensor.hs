@@ -138,13 +138,13 @@ instance Tensor RT where
 
   type TElt RT r = (Unbox r, Elt r)
 
-  entailIndexT  = tag $ Sub Dict
-  entailEqT     = tag $ Sub Dict
-  entailZTT     = tag $ Sub Dict
-  entailNFDataT = tag $ Sub Dict
-  entailRandomT = tag $ Sub Dict
-  entailShowT   = tag $ Sub Dict
-  entailModuleT = tag $ Sub Dict
+  entailIndexT  = Sub Dict
+  entailEqT     = Sub Dict
+  entailZTT     = Sub Dict
+  entailNFDataT = Sub Dict
+  entailRandomT = Sub Dict
+  entailShowT   = Sub Dict
+  entailModuleT = Sub Dict
 
   scalarPow = RT . scalarPow'
 

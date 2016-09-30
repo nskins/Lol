@@ -134,15 +134,15 @@ scalarCRT r = case crtSentinel of
 -- Eq instances
 
 instance (Eq r, Tensor t, Fact m, TElt t r) => Eq (UCyc t m P r) where
-  (Pow v1) == (Pow v2) = v1 == v2 \\ witness entailEqT v1
+  (Pow v1) == (Pow v2) = v1 == v2 \\ entailEqT @t @m @r
   {-# INLINABLE (==) #-}
 
 instance (Eq r, Tensor t, Fact m, TElt t r) => Eq (UCyc t m D r) where
-  (Dec v1) == (Dec v2) = v1 == v2 \\ witness entailEqT v1
+  (Dec v1) == (Dec v2) = v1 == v2 \\ entailEqT @t @m @r
   {-# INLINABLE (==) #-}
 
 instance (Eq r, Tensor t, Fact m, TElt t r) => Eq (UCyc t m C r) where
-  (CRTC _ v1) == (CRTC _ v2) = v1 == v2 \\ witness entailEqT v1
+  (CRTC _ v1) == (CRTC _ v2) = v1 == v2 \\ entailEqT @t @m @r
   {-# INLINABLE (==) #-}
 
 -- no Eq instance for E due to precision
@@ -153,17 +153,17 @@ instance (Eq r, Tensor t, Fact m, TElt t r) => Eq (UCyc t m C r) where
 
 instance (ZeroTestable r, Tensor t, Fact m, TElt t r)
     => ZeroTestable.C (UCyc t m P r) where
-  isZero (Pow v) = isZero v \\ witness entailZTT v
+  isZero (Pow v) = isZero v \\ entailZTT @t @m @r
   {-# INLINABLE isZero #-}
 
 instance (ZeroTestable r, Tensor t, Fact m, TElt t r)
     => ZeroTestable.C (UCyc t m D r) where
-  isZero (Dec v) = isZero v \\ witness entailZTT v
+  isZero (Dec v) = isZero v \\ entailZTT @t @m @r
   {-# INLINABLE isZero #-}
 
 instance (ZeroTestable r, Tensor t, Fact m, TElt t r)
     => ZeroTestable.C (UCyc t m C r) where
-  isZero (CRTC _ v) = isZero v \\ witness entailZTT v
+  isZero (CRTC _ v) = isZero v \\ entailZTT @t @m @r
   {-# INLINABLE isZero #-}
 
 -- no ZT instance for E due to precision
@@ -250,7 +250,7 @@ instance (GFCtx fp d, Fact m, Tensor t, TElt t fp)
          => Module.C (GF fp d) (UCyc t m P fp) where
   -- can use any r-basis to define module mult, but must be
   -- consistent.
-  r *> (Pow v) = Pow $ r LP.*> v \\ witness entailModuleT (r,v)
+  r *> (Pow v) = Pow $ r LP.*> v \\ entailModuleT @t @fp @d @m
 
 
 instance (Reduce a b, Tensor t, Fact m, TElt t a, TElt t b)
@@ -606,15 +606,15 @@ instance (Tensor t, Fact m) => Functor (UCyc t m D) where
 -- it for b.
 
 instance (Tensor t, Fact m) => Applicative (UCyc t m P) where
-  pure = Pow . pure \\ proxy entailIndexT (Proxy::Proxy (t m r))
-  (Pow f) <*> (Pow v) = Pow $ f <*> v \\ witness entailIndexT v
+  pure = Pow . pure \\ entailIndexT @t @m
+  (Pow f) <*> (Pow v) = Pow $ f <*> v \\ entailIndexT @t @m
 
   {-# INLINABLE pure #-}
   {-# INLINABLE (<*>) #-}
 
 instance (Tensor t, Fact m) => Applicative (UCyc t m D) where
-  pure = Dec . pure \\ proxy entailIndexT (Proxy::Proxy (t m r))
-  (Dec f) <*> (Dec v) = Dec $ f <*> v \\ witness entailIndexT v
+  pure = Dec . pure \\ entailIndexT @t @m
+  (Dec f) <*> (Dec v) = Dec $ f <*> v \\ entailIndexT @t @m
 
   {-# INLINABLE pure #-}
   {-# INLINABLE (<*>) #-}
@@ -625,24 +625,24 @@ instance (Tensor t, Fact m) => Applicative (UCyc t m D) where
 
 instance (Tensor t, Fact m) => Foldable (UCyc t m P) where
   {-# INLINABLE foldr #-}
-  foldr f b (Pow v) = F.foldr f b v \\ witness entailIndexT v
+  foldr f b (Pow v) = F.foldr f b v \\ entailIndexT @t @m
 
 instance (Tensor t, Fact m) => Foldable (UCyc t m D) where
   {-# INLINABLE foldr #-}
-  foldr f b (Dec v) = F.foldr f b v \\ witness entailIndexT v
+  foldr f b (Dec v) = F.foldr f b v \\ entailIndexT @t @m
 
 instance (Tensor t, Fact m) => Foldable (UCyc t m C) where
   {-# INLINABLE foldr #-}
-  foldr f b (CRTC _ v) = F.foldr f b v \\ witness entailIndexT v
+  foldr f b (CRTC _ v) = F.foldr f b v \\ entailIndexT @t @m
 
 
 instance (Tensor t, Fact m) => Traversable (UCyc t m P) where
   {-# INLINABLE traverse #-}
-  traverse f (Pow v) = Pow <$> traverse f v \\ witness entailIndexT v
+  traverse f (Pow v) = Pow <$> traverse f v \\ entailIndexT @t @m
 
 instance (Tensor t, Fact m) => Traversable (UCyc t m D) where
   {-# INLINABLE traverse #-}
-  traverse f (Dec v) = Dec <$> traverse f v \\ witness entailIndexT v
+  traverse f (Dec v) = Dec <$> traverse f v \\ entailIndexT @t @m
 
 -- CJP: no Traversable instance for C, because CRTrans for a doesn't
 -- imply it for b.
@@ -652,14 +652,14 @@ instance (Tensor t, Fact m) => Traversable (UCyc t m D) where
 
 instance (Random r, UCRTElt t r, Fact m) => Random (UCyc t m P r) where
 
-  random g = let (v,g') = random g \\ witness entailRandomT v
+  random g = let (v,g') = random g \\ entailRandomT @t @m @r
              in (Pow v, g')
 
   randomR _ = error "randomR non-sensical for UCyc"
 
 instance (Random r, UCRTElt t r, Fact m) => Random (UCyc t m D r) where
 
-  random g = let (v,g') = random g \\ witness entailRandomT v
+  random g = let (v,g') = random g \\ entailRandomT @t @m @r
              in (Dec v, g')
 
   randomR _ = error "randomR non-sensical for UCyc"
@@ -671,7 +671,7 @@ instance (Random r, UCRTElt t r, Fact m)
   random = let cons = case crtSentinel of
                  Left  _ -> Left  . Pow
                  Right s -> Right . CRTC s
-           in \g -> let (v,g') = random g \\ witness entailRandomT v
+           in \g -> let (v,g') = random g \\ entailRandomT @t @m @r
                     in (cons v, g')
 
   randomR _ = error "randomR non-sensical for UCyc"
@@ -688,10 +688,10 @@ instance (Arbitrary (t m r)) => Arbitrary (UCyc t m D r) where
 
 instance (Tensor t, Fact m, NFElt r, TElt t r, TElt t (CRTExt r))
          => NFData (UCyc t m rep r) where
-  rnf (Pow x)      = rnf x \\ witness entailNFDataT x
-  rnf (Dec x)      = rnf x \\ witness entailNFDataT x
-  rnf (CRTC _ x)   = rnf x \\ witness entailNFDataT x
-  rnf (CRTE _ x)   = rnf x \\ witness entailNFDataT x
+  rnf (Pow x)      = rnf x \\ entailNFDataT @t @m @r
+  rnf (Dec x)      = rnf x \\ entailNFDataT @t @m @r
+  rnf (CRTC _ x)   = rnf x \\ entailNFDataT @t @m @r
+  rnf (CRTE _ x)   = rnf x \\ entailNFDataT @t @m @(CRTExt r)
 
 instance (Protoable (t m r)) => Protoable (UCyc t m D r) where
   type ProtoType (UCyc t m D r) = ProtoType (t m r)

@@ -82,26 +82,19 @@ class (TElt t Double, TElt t (Complex Double)) => Tensor t where
   type TElt t r :: Constraint
 
   -- | Properties that hold for any index. Use with '\\'.
-  entailIndexT :: Tagged (t m r)
-                  (Fact m :- (Applicative (t m), Traversable (t m)))
+  entailIndexT  :: Fact m :- (Applicative (t m), Traversable (t m))
   -- | Holds for any (legal) fully-applied tensor. Use with '\\'.
-  entailEqT :: Tagged (t m r)
-               ((Eq r, Fact m, TElt t r) :- Eq (t m r))
+  entailEqT     :: forall m r . (Eq r, Fact m, TElt t r) :- Eq (t m r)
   -- | Holds for any (legal) fully-applied tensor. Use with '\\'.
-  entailZTT :: Tagged (t m r)
-               ((ZeroTestable r, Fact m, TElt t r) :- ZeroTestable (t m r))
+  entailZTT     :: forall m r . (ZeroTestable r, Fact m, TElt t r) :- ZeroTestable (t m r)
   -- | Holds for any (legal) fully-applied tensor. Use with '\\'.
-  entailNFDataT :: Tagged (t m r)
-                   ((NFData r, Fact m, TElt t r) :- NFData (t m r))
+  entailNFDataT :: forall m r . (NFData r, Fact m, TElt t r) :- NFData (t m r)
   -- | Holds for any (legal) fully-applied tensor. Use with '\\'.
-  entailRandomT :: Tagged (t m r)
-                   ((Random r, Fact m, TElt t r) :- Random (t m r))
+  entailRandomT :: forall m r . (Random r, Fact m, TElt t r) :- Random (t m r)
   -- | Holds for any (legal) fully-applied tensor. Use with '\\'.
-  entailShowT :: Tagged (t m r)
-                 ((Show r, Fact m, TElt t r) :- Show (t m r))
+  entailShowT   :: forall m r . (Show r, Fact m, TElt t r) :- Show (t m r)
   -- | Holds for any (legal) fully-applied tensor. Use with '\\'.
-  entailModuleT :: Tagged (GF fp d, t m fp)
-                   ((GFCtx fp d, Fact m, TElt t fp) :- Module (GF fp d) (t m fp))
+  entailModuleT :: forall fp d m . (GFCtx fp d, Fact m, TElt t fp) :- Module (GF fp d) (t m fp)
 
   -- | Convert a scalar to a tensor in the powerful basis.
   scalarPow :: (Additive r, Fact m, TElt t r) => r -> t m r

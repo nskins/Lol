@@ -239,14 +239,14 @@ instance Tensor CT where
 
   type TElt CT r = (Storable r, Dispatch r)
 
-  entailIndexT = tag $ Sub Dict
-  entailEqT = tag $ Sub Dict
-  entailZTT = tag $ Sub Dict
-  -- entailRingT = tag $ Sub Dict
-  entailNFDataT = tag $ Sub Dict
-  entailRandomT = tag $ Sub Dict
-  entailShowT = tag $ Sub Dict
-  entailModuleT = tag $ Sub Dict
+  entailIndexT = Sub Dict
+  entailEqT = Sub Dict
+  entailZTT = Sub Dict
+  -- entailRingT = Sub Dict
+  entailNFDataT = Sub Dict
+  entailRandomT = Sub Dict
+  entailShowT = Sub Dict
+  entailModuleT = Sub Dict
 
   scalarPow = CT . scalarPow' -- Vector code
 
