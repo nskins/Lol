@@ -34,7 +34,7 @@ module Crypto.Lol.FactoredDefs
 -- * Convenient reflections
 , ppsFact, valueFact, totientFact, radicalFact, oddRadicalFact, valueHatFact
 , ppPPow, primePPow, exponentPPow, valuePPow, totientPPow, radicalPPow, oddRadicalPPow, valueHatPPow
-, valuePrime, valuePrimeT
+, valuePrime
 -- * Data-level equivalents of reflections for 'Factored' data
 , valueF, totientF, radicalF, oddRadicalF, valueHatF
 -- * Number-theoretic laws
@@ -52,7 +52,6 @@ import Crypto.Lol.PosBin
 
 import Control.Arrow
 import Data.Constraint           hiding ((***), (&&&))
-import Data.Functor.Trans.Tagged
 import Data.List                 hiding ((\\))
 import Data.Singletons.Prelude   hiding ((:-))
 import Data.Singletons.TH
@@ -344,9 +343,6 @@ ppsFact = map ppToPP $ unF $ fromSing (sing :: SFactored m)
 -- | The value of a 'PrimeBin' type.
 valuePrime :: forall p . Prime p => Int
 valuePrime = binToInt $ unP $ fromSing (sing :: SPrimeBin p)
-
-valuePrimeT :: forall p . Prime p => Tagged p Int
-valuePrimeT = tag $ binToInt $ unP $ fromSing (sing :: SPrimeBin p)
 
 valueFact, totientFact, radicalFact, oddRadicalFact, valueHatFact :: forall m . (Fact m) => Int
 -- | The value of a 'Factored' type.

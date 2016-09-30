@@ -14,7 +14,6 @@ import NumericPrelude
 
 import Crypto.Lol.Factored
 
-import Control.Applicative
 import Data.Functor.Trans.Tagged
 import Data.Proxy
 import Data.Reflection

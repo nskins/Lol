@@ -91,6 +91,7 @@ library
     Crypto.Lol
     Crypto.Lol.Types
     Crypto.Lol.Factored
+    Crypto.Lol.FactoredT
     Crypto.Lol.Reflects
     Crypto.Lol.CRTrans
     Crypto.Lol.Gadget

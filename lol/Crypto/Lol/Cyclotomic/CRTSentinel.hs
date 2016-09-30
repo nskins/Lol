@@ -2,6 +2,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PolyKinds             #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
 
@@ -16,9 +17,7 @@ module Crypto.Lol.Cyclotomic.CRTSentinel
 , embedCRTCS, twaceCRTCS
 ) where
 
-import Data.Functor.Trans.Tagged
 import Data.Maybe
-import Data.Proxy
 
 import Crypto.Lol.CRTrans
 import Crypto.Lol.Cyclotomic.Tensor
@@ -35,7 +34,7 @@ crtSentinel = fromMaybe (Left ESentinel) (Right <$> crtCSentinel)
 crtCSentinel :: forall t m r .
                 (Tensor t, Fact m, CRTrans Maybe r, TElt t r)
                 => Maybe (CSentinel t m r)
-crtCSentinel = proxyT hasCRTFuncs (Proxy::Proxy (t m r)) *>
+crtCSentinel = hasCRTFuncs @t @m @r *>
                pure CSentinel
 {-# INLINABLE crtCSentinel #-}
 

@@ -128,7 +128,7 @@ ppTensor :: forall pp r mon . (PPow pp, Monad mon)
 ppTensor func = tagT $ case (sing :: SPrimePower pp) of
   (SPP (STuple2 sp _)) -> do
     func' <- withWitnessT func sp
-    let lts = (valuePPow @pp) `div` (withWitness valuePrimeT sp) -- EAC: can't figure out how to do this with TA yet
+    let lts = (valuePPow @pp) `div` (withWitness valuePrime' sp) -- EAC: can't figure out how to do this with TA yet
     return $ Id lts @* func'
 {-# INLINABLE ppTensor #-}
 

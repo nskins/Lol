@@ -13,6 +13,7 @@
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE StandaloneDeriving         #-}
 {-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE UndecidableInstances       #-}
@@ -33,12 +34,14 @@ module Crypto.Lol.Prelude
 , Subgroup(..)
 , Reduce(..), LiftOf, Lift, Lift'(..), Rescale(..), Encode(..), msdToLSD
 , CharOf
+, wrapAmbiguous
 -- * Numeric
 , module Crypto.Lol.Types.Numeric
 -- * Complex
 , module Crypto.Lol.Types.Complex
 -- * Factored
 , module Crypto.Lol.Factored
+, module Crypto.Lol.FactoredT
 -- * Miscellaneous
 , rescaleMod, roundCoset
 , fromJust', pureT, peelT, pasteT, withWitness, withWitnessT
@@ -47,6 +50,7 @@ module Crypto.Lol.Prelude
 ) where
 
 import Crypto.Lol.Factored
+import Crypto.Lol.FactoredT
 import Crypto.Lol.Types.Complex
 import Crypto.Lol.Types.Numeric
 
@@ -304,3 +308,6 @@ withWitnessT :: forall n mon r .
                 (SingI n => TaggedT n mon r) -> Sing n -> mon r
 withWitnessT t wit = withSingI wit $ proxyT t (Proxy::Proxy n)
 {-# INLINABLE withWitnessT #-}
+
+wrapAmbiguous :: forall (a :: k) b . (SingI a) => (forall (t :: k) . (SingI t) => b) -> Tagged a b
+wrapAmbiguous f = tag $ f @a

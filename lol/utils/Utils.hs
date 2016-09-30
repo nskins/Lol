@@ -1,6 +1,6 @@
-{-# LANGUAGE ConstraintKinds, DataKinds, FlexibleContexts, FlexibleInstances,
+{-# LANGUAGE AllowAmbiguousTypes, ConstraintKinds, DataKinds, FlexibleContexts, FlexibleInstances,
              GADTs, KindSignatures, MultiParamTypeClasses, PolyKinds,
-             RankNTypes, ScopedTypeVariables, TypeFamilies, TypeOperators,
+             RankNTypes, ScopedTypeVariables, TypeApplications, TypeFamilies, TypeOperators,
              UndecidableInstances #-}
 
 module Utils
@@ -61,7 +61,7 @@ instance Show (ArgType HashDRBG) where
   show _ = "HashDRBG"
 
 instance (Fact m) => Show (ArgType m) where
-  show _ = "F" ++ show (proxy valueFact (Proxy::Proxy m))
+  show _ = "F" ++ (show $ valueFact @m)
 
 instance (Mod (ZqBasic q i), Show i) => Show (ArgType (ZqBasic q i)) where
   show _ = "Q" ++ show (proxy modulus (Proxy::Proxy (ZqBasic q i)))

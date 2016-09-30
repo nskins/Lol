@@ -395,17 +395,17 @@ ctCRTInv = do
   return $ \x -> unsafePerformIO $
     withPtrArray ruinv' (\ruptr -> with mhatInv (flip withBasicArgs x . dcrtinv ruptr))
 
-cZipDispatch :: forall m r . (Storable r, Fact m)
+cZipDispatch :: (Storable r, Fact m)
   => (Ptr r -> Ptr r -> Int64 -> IO ())
      -> Tagged m (CT' m r -> CT' m r -> CT' m r)
-cZipDispatch f =
-  let totm = fromIntegral $ totientFact @m
-  in return $ coerce $ \a b -> unsafePerformIO $ do
-      yout <- SV.thaw a
-      SM.unsafeWith yout (\pout ->
-        SV.unsafeWith b (\pin ->
-          f pout pin totm))
-      unsafeFreeze yout
+cZipDispatch f = do -- in Tagged m
+  totm <- fromIntegral <$> totientFact'
+  return $ coerce $ \a b -> unsafePerformIO $ do
+    yout <- SV.thaw a
+    SM.unsafeWith yout (\pout ->
+      SV.unsafeWith b (\pin ->
+        f pout pin totm))
+    unsafeFreeze yout
 
 cDispatchGaussian :: forall m r var rnd .
          (Storable r, Transcendental r, Dispatch r, Ord r,
@@ -485,7 +485,7 @@ ruInv = do
 wrapVector :: forall mon m r . (Monad mon, Fact m, Ring r, Storable r)
   => TaggedT m mon (Kron r) -> mon (CT' m r)
 wrapVector v = do
-  vmat <- proxyT v (Proxy::Proxy m) -- EAC: couldn't get VTA working here.
+  vmat <- untagT v
   let n = totientFact @m
   return $ CT' $ generate n (flip (indexK vmat) 0)
 
