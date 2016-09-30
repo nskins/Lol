@@ -332,7 +332,7 @@ coerceEm = (coerce <$>) . untagT
 
 -- | Useful coersion for defining @coeffs@ in the @Tensor@
 -- interface. Using 'coerce' alone is insufficient for type inference.
-coerceCoeffs :: Tagged '(m,m') (Vector r -> [Vector r]) -> CT' m' r -> [CT' m r]
+coerceCoeffs :: Tagged '(m, m') (Vector r -> [Vector r]) -> CT' m' r -> [CT' m r]
 coerceCoeffs = coerce
 
 -- | Useful coersion for defining @powBasisPow@ and @crtSetDec@ in the @Tensor@

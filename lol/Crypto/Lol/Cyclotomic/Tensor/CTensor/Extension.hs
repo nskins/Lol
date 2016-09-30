@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes   #-}
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleContexts      #-}
@@ -5,7 +6,7 @@
 {-# LANGUAGE PolyKinds             #-}
 {-# LANGUAGE RebindableSyntax      #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
 
@@ -27,7 +28,6 @@ import Crypto.Lol.Types.ZmStar
 
 
 import Control.Applicative hiding (empty)
-import Control.Monad.Trans (lift)
 
 import           Data.Maybe
 import           Data.Reflection      (reify)
@@ -48,39 +48,39 @@ backpermute' :: (Storable a) =>
 {-# INLINABLE backpermute' #-}
 backpermute' is v = generate (U.length is) (\i -> v ! (is U.! i))
 
-embedPow', embedDec' :: (Additive r, Storable r, m `Divides` m')
+embedPow', embedDec' :: forall m m' r . (Additive r, Storable r, m `Divides` m')
                      => Tagged '(m, m') (Vector r -> Vector r)
 {-# INLINABLE embedPow' #-}
 {-# INLINABLE embedDec' #-}
 -- | Embeds an vector in the powerful basis of the the mth cyclotomic ring
 -- to an vector in the powerful basis of the m'th cyclotomic ring when @m | m'@
-embedPow' = (\indices arr -> generate (U.length indices) $ \idx ->
+embedPow' = tag $ (\indices arr -> generate (U.length indices) $ \idx ->
   let (j0,j1) = indices U.! idx
   in if j0 == 0
      then arr ! j1
-     else zero) <$> baseIndicesPow
+     else zero) $ baseIndicesPow @m @m'
 -- | Embeds an vector in the decoding basis of the the mth cyclotomic ring
 -- to an vector in the decoding basis of the m'th cyclotomic ring when @m | m'@
-embedDec' = (\indices arr -> generate (U.length indices)
+embedDec' = tag $ (\indices arr -> generate (U.length indices)
   (\idx -> maybe LP.zero
     (\(sh,b) -> if b then negate (arr ! sh) else arr ! sh)
-    (indices U.! idx))) <$> baseIndicesDec
+    (indices U.! idx))) $ baseIndicesDec @m @m'
 
 -- | Embeds an vector in the CRT basis of the the mth cyclotomic ring
 -- to an vector in the CRT basis of the m'th cyclotomic ring when @m | m'@
-embedCRT' :: forall mon m m' r . (CRTrans mon r, Storable r, m `Divides` m')
+embedCRT' :: forall m m' mon r . (CRTrans mon r, Storable r, m `Divides` m')
           => TaggedT '(m, m') mon (Vector r -> Vector r)
-embedCRT' =
-  (lift (proxyT crtInfo (Proxy::Proxy m') :: mon (CRTInfo r))) >>
-  (pureT $ backpermute' <$> baseIndicesCRT)
+embedCRT' = tagT $
+  (proxyT crtInfo (Proxy::Proxy m') :: mon (CRTInfo r)) >>
+  (pure $ backpermute' $ baseIndicesCRT @m @m')
 
 -- | maps a vector in the powerful/decoding basis, representing an
 -- O_m' element, to a vector of arrays representing O_m elements in
 -- the same type of basis
-coeffs' :: (Storable r, m `Divides` m')
-        => Tagged '(m, m') (Vector r -> [Vector r])
-coeffs' = flip (\x -> V.toList . V.map (`backpermute'` x))
-          <$> extIndicesCoeffs
+coeffs' :: forall m m' r . (Storable r, m `Divides` m')
+        => Tagged '(m,m') (Vector r -> [Vector r])
+coeffs' = tag $ flip (\x -> V.toList . V.map (`backpermute'` x))
+          $ extIndicesCoeffs @m @m'
 
 -- | The "tweaked trace" function in either the powerful or decoding
 -- basis of the m'th cyclotomic ring to the mth cyclotomic ring when
@@ -88,9 +88,9 @@ coeffs' = flip (\x -> V.toList . V.map (`backpermute'` x))
 twacePowDec' :: forall m m' r . (Storable r, m `Divides` m')
              => Tagged '(m, m') (Vector r -> Vector r)
 {-# INLINABLE twacePowDec' #-}
-twacePowDec' = backpermute' <$> extIndicesPowDec
+twacePowDec' = tag $ backpermute' $ extIndicesPowDec @m @m'
 
-kronToVec :: forall mon m r . (Monad mon, Fact m, Ring r, Storable r)
+kronToVec :: forall m mon r . (Monad mon, Fact m, Ring r, Storable r)
   => TaggedT m mon (Kron r) -> TaggedT m mon (Vector r)
 kronToVec v = do
   vmat <- v
@@ -102,12 +102,12 @@ twaceCRT' :: forall mon m m' r .
              => TaggedT '(m, m') mon (Vector r -> Vector r)
 {-# INLINE twaceCRT' #-}
 twaceCRT' = tagT $ do
-  g' <- proxyT (kronToVec gCRTK) (Proxy::Proxy m')
-  gInv <- proxyT (kronToVec gInvCRTK) (Proxy::Proxy m)
-  embed <- proxyT embedCRT' (Proxy::Proxy '(m,m'))
-  indices <- pure $ proxy extIndicesCRT (Proxy::Proxy '(m,m'))
+  g' <- untagT $ kronToVec @m' gCRTK
+  gInv <- untagT $ kronToVec @m gInvCRTK
   (_, m'hatinv) <- proxyT crtInfo (Proxy::Proxy m')
-  let phi = totientFact @m
+  embed <- untagT $ embedCRT' @m @m'
+  let indices = extIndicesCRT @m @m'
+      phi = totientFact @m
       phi' = totientFact @m'
       mhat = fromIntegral $ valueHatFact @m
       hatRatioInv = m'hatinv * mhat
@@ -123,9 +123,9 @@ twaceCRT' = tagT $ do
 powBasisPow' :: forall m m' r . (m `Divides` m', Ring r, SV.Storable r)
                 => Tagged '(m, m') [SV.Vector r]
 powBasisPow' = do
-  (_, phi, phi', _) <- indexInfo
-  idxs <- baseIndicesPow
-  return $ LP.map (\k -> generate phi' $ \j ->
+  let (_, phi, phi', _) = indexInfo @m @m'
+      idxs = baseIndicesPow @m @m'
+  return $  LP.map (\k -> generate phi' $ \j ->
                            let (j0,j1) = idxs U.! j
                           in if j0==k && j1==0 then one else zero)
     [0..phi' `div` phi - 1]
