@@ -61,8 +61,8 @@ errorBound :: (Ord v, Transcendental v, Fact m)
               -> v              -- ^ \(\epsilon\)
               -> Tagged m v
 errorBound v eps = do
-  n <- fromIntegral <$> totientFact
-  mhat <- fromIntegral <$> valueHatFact
+  n <- fromIntegral <$> totientFact'
+  mhat <- fromIntegral <$> valueHatFact'
   let stabilize x =
         let x' = (1/2 + log (2 * pi * x)/2 - log eps/n)/pi
         in if x'-x < 0.0001 then x' else stabilize x'

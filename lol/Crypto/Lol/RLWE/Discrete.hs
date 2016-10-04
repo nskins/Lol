@@ -53,9 +53,9 @@ errorBound :: (RealRing v, Transcendental v, Fact m)
               -> v              -- ^ \(\epsilon\)
               -> Tagged m Int64
 errorBound v eps = do
-  n <- fromIntegral <$> totientFact
+  n <- fromIntegral <$> totientFact'
   cont <- C.errorBound v eps -- continuous bound
-  ps <- filter (/= 2) . fmap fst <$> ppsFact -- odd primes dividing m
+  ps <- filter (/= 2) . fmap fst <$> ppsFact' -- odd primes dividing m
   let stabilize x =
         let x' = (1/2 + log(2 * pi * x)/2 - log eps)/pi
         in if x'-x < 0.0001 then x' else stabilize x'
