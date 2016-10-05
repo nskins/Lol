@@ -14,7 +14,7 @@
 -- (Additive z)
 
 module Crypto.Lol.Types.ZqBasic
-( ZqBasic -- export the type, but not the constructor (for safety)
+( ZqBasic(..) -- export the type, but not the constructor (for safety)
 , goodQs
 ) where
 
@@ -161,6 +161,7 @@ mhatInv = let qval = proxy value (Proxy::Proxy q)
 -- instance of CRTrans
 instance (Reflects q z, ToInteger z, PID z, Enumerable (ZqBasic q z))
          => CRTrans Maybe (ZqBasic q z) where
+  type CRTIndex (ZqBasic q z) = Int
 
   crtInfo = (,) <$> principalRootUnity <*> mhatInv
 

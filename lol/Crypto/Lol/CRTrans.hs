@@ -30,7 +30,7 @@ import Control.Arrow
 --
 --     (2) the multiplicative inverse of \(\hat{m}\in R\).
 
-type CRTInfo r = (Int -> r, r)
+type CRTInfo r = (CRTIndex r -> r, r)
 
 -- | A ring that (possibly) supports invertible Chinese remainder
 -- transformations of various indices.
@@ -41,6 +41,8 @@ type CRTInfo r = (Int -> r, r)
 -- it should be the case that \(\omega_{m'}^{m'/m}=\omega_m\).
 
 class (Monad mon, Ring r) => CRTrans mon r where
+
+  type CRTIndex r
 
   -- | 'CRTInfo' for a given index \(m\). The method itself may be
   -- slow, but the function it returns should be fast, e.g., via
@@ -58,7 +60,9 @@ class (Ring r, Ring (CRTExt r)) => CRTEmbed r where
   fromExt :: CRTExt r -> r
 
 -- | Product ring
-instance (CRTrans mon a, CRTrans mon b) => CRTrans mon (a,b) where
+instance (CRTrans mon a, CRTrans mon b, CRTIndex a ~ Int, CRTIndex b ~ Int)
+  => CRTrans mon (a,b) where
+  type CRTIndex (a,b) = Int
   crtInfo = do
     (fa, inva) <- crtInfo
     (fb, invb) <- crtInfo
@@ -72,6 +76,7 @@ instance (CRTEmbed a, CRTEmbed b) => CRTEmbed (a,b) where
 
 -- | Complex numbers have 'CRTrans' for any index \(m\)
 instance (Monad mon, Transcendental a) => CRTrans mon (Complex a) where
+  type CRTIndex (Complex a) = Int
   crtInfo = crtInfoC
 
 crtInfoC :: forall mon m a . (Monad mon, Reflects m Int, Transcendental a)
@@ -90,13 +95,21 @@ instance (Transcendental a) => CRTEmbed (Complex a) where
   fromExt = id
 
 -- | Returns 'Nothing'
-instance CRTrans Maybe Double where crtInfo = tagT Nothing
+instance CRTrans Maybe Double where
+  type CRTIndex Double = Int
+  crtInfo = tagT Nothing
 -- | Returns 'Nothing'
-instance CRTrans Maybe Int where crtInfo = tagT Nothing
+instance CRTrans Maybe Int where
+  type CRTIndex Int = Int
+  crtInfo = tagT Nothing
 -- | Returns 'Nothing'
-instance CRTrans Maybe Int64 where crtInfo = tagT Nothing
+instance CRTrans Maybe Int64 where
+  type CRTIndex Int64 = Int
+  crtInfo = tagT Nothing
 -- | Returns 'Nothing'
-instance CRTrans Maybe Integer where crtInfo = tagT Nothing
+instance CRTrans Maybe Integer where
+  type CRTIndex Integer = Int
+  crtInfo = tagT Nothing
 -- can also do for Int8, Int16, Int32 etc.
 
 -- | Embeds into the complex numbers \(\C\).

@@ -12,6 +12,7 @@ import CycBenches
 import Crypto.Lol
 import Crypto.Lol.Types
 import Crypto.Random.DRBG
+import Crypto.Lol.Cyclotomic.Tensor.Accelerate
 
 import Control.Applicative
 import Control.Monad (when, join)

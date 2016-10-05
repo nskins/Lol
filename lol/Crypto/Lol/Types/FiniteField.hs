@@ -89,6 +89,7 @@ instance (GFCtx fp d) => Field.C (GF fp d) where
                            in GF a
 
 instance (GFCtx fp d) => CRTrans Maybe (GF fp d) where
+  type CRTIndex (GF fp d) = Int
 
   crtInfo :: forall m . (Reflects m Int) => TaggedT m Maybe (CRTInfo (GF fp d))
   crtInfo = tagT $ (,) <$> omegaPow <*> scalarInv

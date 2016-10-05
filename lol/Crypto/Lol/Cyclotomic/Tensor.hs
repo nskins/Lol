@@ -51,8 +51,8 @@ import           Data.Constraint
 import           Data.Singletons.Prelude hiding ((:-))
 import           Data.Traversable
 import           Data.Tuple              (swap)
-import qualified Data.Vector             as V
-import qualified Data.Vector.Unboxed     as U
+import           Data.Vector.Generic hiding (sum)
+import qualified Data.Vector as V
 
 -- | 'Tensor' encapsulates all the core linear transformations needed
 -- for cyclotomic ring arithmetic.
@@ -278,7 +278,7 @@ indexK (MKron m (MC r c mc)) i j =
       (jq,jr) = j `divMod` c
       in indexK m iq jq * mc ir jr
 
-gCRTK, gInvCRTK :: (Fact m, CRTrans mon r) => TaggedT m mon (Kron r)
+gCRTK, gInvCRTK :: (Fact m, CRTrans mon r, CRTIndex r ~ Int) => TaggedT m mon (Kron r)
 -- | A \(\varphi(m)\)-by-1 matrix of the CRT coefficients of \(g_m\), for
 -- \(m\)th cyclotomic.
 gCRTK = fKron gCRTPPow
@@ -288,12 +288,12 @@ gInvCRTK = fKron gInvCRTPPow
 
 -- | The "tweaked" \(\CRT^*\) matrix:
 -- \(\CRT^* \cdot \text{diag}(\sigma(g_m))\).
-twCRTs :: (Fact m, CRTrans mon r) => TaggedT m mon (Kron r)
+twCRTs :: (Fact m, CRTrans mon r, CRTIndex r ~ Int) => TaggedT m mon (Kron r)
 twCRTs = fKron twCRTsPPow
 
 -- | The "tweaked" \(\CRT^*\) matrix (for prime powers):
 -- \(\CRT^* \cdot \text{diag}(\sigma(g_p))\).
-twCRTsPPow :: (PPow pp, CRTrans mon r) => TaggedT pp mon (KronC r)
+twCRTsPPow :: (PPow pp, CRTrans mon r, CRTIndex r ~ Int) => TaggedT pp mon (KronC r)
 twCRTsPPow = do
   phi    <- pureT totientPPow
   iToZms <- pureT indexToZmsPPow
@@ -303,11 +303,11 @@ twCRTsPPow = do
 
   return $ MC phi phi (\j i -> wPow (jToPow j * negate (iToZms i)) * gCRT i 0)
 
-gCRTPPow, gInvCRTPPow :: (PPow pp, CRTrans mon r) => TaggedT pp mon (KronC r)
+gCRTPPow, gInvCRTPPow :: (PPow pp, CRTrans mon r, CRTIndex r ~ Int) => TaggedT pp mon (KronC r)
 gCRTPPow = ppKron gCRTPrime
 gInvCRTPPow = ppKron gInvCRTPrime
 
-gCRTPrime, gInvCRTPrime :: (Prime p, CRTrans mon r) => TaggedT p mon (KronC r)
+gCRTPrime, gInvCRTPrime :: (Prime p, CRTrans mon r, CRTIndex r ~ Int) => TaggedT p mon (KronC r)
 
 -- | A \((p-1)\)-by-1 matrix of the CRT coefficients of \(g_p\), for
 -- \(p\)th cyclotomic.
@@ -414,58 +414,58 @@ indexInfo = let pps = proxy ppsFact (Proxy::Proxy m)
 -- | A vector of \(\varphi(m)\) entries, where the \(i\)th entry is
 -- the index into the powerful\/decoding basis of \(\O_{m'}\) of the
 -- \(i\)th entry of the powerful/decoding basis of \(\O_m\).
-extIndicesPowDec :: (m `Divides` m') => Tagged '(m, m') (U.Vector Int)
+extIndicesPowDec :: (m `Divides` m', Vector v Int) => Tagged '(m, m') (v Int)
 {-# INLINABLE extIndicesPowDec #-}
 extIndicesPowDec = do
   (_, phi, _, tots) <- indexInfo
-  return $ U.generate phi (fromIndexPair tots . (0,))
+  return $ generate phi (fromIndexPair tots . (0,))
 
 -- | A vector of \(\varphi(m)\) blocks of \(\varphi(m')/\varphi(m)\) consecutive
 -- entries. Each block contains all those indices into the CRT basis
 -- of \(\O_{m'}\) that "lie above" the corresponding index into the CRT
 -- basis of \(\O_m\).
-extIndicesCRT :: forall m m' . (m `Divides` m')
-                 => Tagged '(m, m') (U.Vector Int)
+extIndicesCRT :: forall m m' v . (m `Divides` m', Vector v Int)
+                 => Tagged '(m, m') (v Int)
 extIndicesCRT = do
   (_, phi, phi', tots) <- indexInfo
-  return $ U.generate phi'
+  return $ generate phi'
            (fromIndexPair tots . swap . (`divMod` (phi' `div` phi)))
 
-baseWrapper :: forall m m' a . (m `Divides` m', U.Unbox a)
+baseWrapper :: forall m m' v a . (m `Divides` m', Vector v a)
                => ([(Int,Int,Int)] -> Int -> a)
-               -> Tagged '(m, m') (U.Vector a)
+               -> Tagged '(m, m') (v a)
 baseWrapper f = do
   (mpps, _, phi', _) <- indexInfo
-  return $ U.generate phi' (f mpps)
+  return $ generate phi' (f mpps)
 
 -- | A lookup table for 'toIndexPair' applied to indices \([\varphi(m')]\).
-baseIndicesPow :: forall m m' . (m `Divides` m')
-                  => Tagged '(m, m') (U.Vector (Int,Int))
+baseIndicesPow :: forall m m' v . (m `Divides` m', Vector v (Int,Int))
+                  => Tagged '(m, m') (v (Int,Int))
 baseIndicesPow = baseWrapper (toIndexPair . totients)
 {-# INLINABLE baseIndicesPow #-}
 
 -- | A lookup table for 'baseIndexDec' applied to indices \([\varphi(m')]\).
-baseIndicesDec :: forall m m' . (m `Divides` m')
-                  => Tagged '(m, m') (U.Vector (Maybe (Int,Bool)))
+baseIndicesDec :: forall m m' v . (m `Divides` m', Vector v (Maybe (Int,Bool)))
+                  => Tagged '(m, m') (v (Maybe (Int,Bool)))
 -- this one is more complicated; requires the prime powers
 baseIndicesDec = baseWrapper baseIndexDec
 {-# INLINABLE baseIndicesDec #-}
 
 -- | Same as 'baseIndicesPow', but only includes the second component
 -- of each pair.
-baseIndicesCRT :: forall m m' . (m `Divides` m')
-                  => Tagged '(m, m') (U.Vector Int)
+baseIndicesCRT :: forall m m' v . (m `Divides` m', Vector v Int)
+                  => Tagged '(m, m') (v Int)
 baseIndicesCRT =
   baseWrapper (\pps -> snd . toIndexPair (totients pps))
 
 -- | The \(i_0\)th entry of the \(i_1\)th vector is
 -- 'fromIndexPair' \((i_1,i_0)\).
-extIndicesCoeffs :: forall m m' . (m `Divides` m')
-                    => Tagged '(m, m') (V.Vector (U.Vector Int))
+extIndicesCoeffs :: forall m m' v . (m `Divides` m', Vector v Int)
+                    => Tagged '(m, m') (V.Vector (v Int))
 extIndicesCoeffs = do
   (_, phi, phi', tots) <- indexInfo
   return $ V.generate (phi' `div` phi)
-           (\i1 -> U.generate phi (\i0 -> fromIndexPair tots (i1,i0)))
+           (\i1 -> generate phi (\i0 -> fromIndexPair tots (i1,i0)))
 
 -- | Convenient reindexing functions
 
