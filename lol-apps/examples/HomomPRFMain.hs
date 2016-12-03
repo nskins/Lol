@@ -12,6 +12,7 @@ import Control.DeepSeq
 import Control.Monad.Random
 import Control.Monad.Reader
 import Control.Monad.State
+import Control.Monad.Writer
 
 import Crypto.Lol
 import Crypto.Lol.Applications.HomomPRF
@@ -27,13 +28,13 @@ main = do
   sk <- genSK v
   (tHints, skout) <- tunnelHints sk
   rHints <- roundHints skout
-  let hints = Hints tHints rHints :: EvalHints CPP.CT RngList Int64 ZP8 ZQ4 ZQSeq KSGad
+  let hints = Hints tHints rHints :: EvalHints CPP.CT RngList Int64 ZP ZQ6 ZQSeq KSGad
   family :: PRFFamily PRFGad _ _ <- randomFamily 10 -- works on 10-bit input
   s <- getRandom
   let st = prfState family Nothing --initialize with input 0
   ct <- encrypt sk s
   let prf = homomPRFM ct
       xs = grayCode 3
-      encprfs = flip runReader hints $ flip evalStateT st $ mapM prf xs
+      (encprfs, log :: [LogEntry ErrorRate]) = runWriter . flip runReaderT hints $ flip evalStateT st $ mapM prf xs
       decprfs = decrypt skout <$> encprfs
   decprfs `deepseq` return ()

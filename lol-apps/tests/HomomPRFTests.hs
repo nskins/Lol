@@ -75,7 +75,7 @@ prop_keyHomom size s sk = testIO $ do
   rHints <- roundHints skout
   let hints = Hints tHints rHints :: EvalHints t rngs z zp zq zqs ksgad
   ct <- encrypt sk s
-  let encPRF = homomPRF hints ct x st
+  let encPRF = (unNL :: NoLog [LogEntry ErrorRate] _ -> _) $ homomPRF hints ct x st
       decPRF = decrypt skout encPRF
   return $ decPRF == hoppedClear
 

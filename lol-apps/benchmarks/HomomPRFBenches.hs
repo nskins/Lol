@@ -45,5 +45,5 @@ benchHomomPRF size t xs _ _ = benchGroup "HomomPRF" $ (:[]) $ do
   ct <- encrypt sk s
   return (bench "homomprf" $ nf
     (let st = prfState family Nothing --initialize with input 0
-         encprfs = flip runReader hints . flip evalStateT st . mapM (homomPRFM ct)
+         encprfs = (unNL :: NoLog [LogEntry ErrorRate] _ -> _) . flip runReaderT hints . flip evalStateT st . mapM (homomPRFM ct)
      in map (decrypt skout) . encprfs) xs :: Benchmark)
