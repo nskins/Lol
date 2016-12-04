@@ -59,3 +59,5 @@ This command builds the C++ library for lol-cpp and the loads
 all imported files from lol* packages from source. You may
 need to run 'stack bench lol-cpp' or similar first to install
 the necessary dependencies.
+
+You can load all top-level executables with ./ghci AllMain.hs
