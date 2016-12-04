@@ -1,3 +1,11 @@
+This branch (typed-tensor-dsl) attempts to give type safety to the (repa) tensor
+DSL. Progress is stalled now because of fTensor, which takes a (forall pp) function
+and outputs an operator for any Factored index. This requires the ability to
+grab the prime power components of a Factored (easy) and then know that when
+you multiply them all together, you get back the original Factored (hard).
+
+--------------------------------------------------------------------------------
+
 This repository contains several Haskell libraries:
 
   * The `lol` directory contains the Haskell library Λ ○ λ (Lol),
