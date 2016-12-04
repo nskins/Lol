@@ -1,3 +1,17 @@
+This branch (offline-suppress) was created expressly for generating (real)
+RLWE/RLWR challenges. Previously, the 'suppress' phase of generation required
+an internet connection to download the necessary NIST beacons and certificate.
+However, we generate the challenges on an air-gapped machine, so we have to
+supply the beacons and certificates separately and load them from disk during
+the 'suppress' phase. This branch modifies the 'suppress' stage to do exactly
+that.
+
+This branch was forked a long time ago, but very few changes have been made
+to the challenge code in the interim. Thus we will keep this branch (or merge it)
+just in case we want to release more challenges later.
+
+--------------------------------------------------------------------------------
+
 This repository contains several Haskell libraries:
 
   * The `lol` directory contains the Haskell library Λ ○ λ (Lol),
