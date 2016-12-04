@@ -1,3 +1,11 @@
+This branch (acctensor2) is another attempt to make Lol support Trevor's
+Accelerate backend. While the result is cleaner than the acctensor branch,
+there's a fatal flaw: it requires the constraint `CRTrans mon r` to be in
+`TElt t r`, which of course can't work. This branch is currently dead, but is
+kept around to document what has been attempted.
+
+--------------------------------------------------------------------------------
+
 This repository contains several Haskell libraries:
 
   * The `lol` directory contains the Haskell library Λ ○ λ (Lol),
