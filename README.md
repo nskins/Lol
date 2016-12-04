@@ -1,3 +1,10 @@
+This branch (debug-homomprf) is a fork of split-pacakges. Relative to split-pacakges,
+it attempts to implement a way to get the error term of intermediate ciphertexts
+for analysis. This will allow us to better evaluate how noise is growing and to
+determine how large/many moduli we need. Currently under active development.
+
+--------------------------------------------------------------------------------
+
 This repository contains several Haskell libraries:
 
   * The `lol` directory contains the Haskell library Λ ○ λ (Lol),
