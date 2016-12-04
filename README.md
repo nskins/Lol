@@ -1,3 +1,11 @@
+This branch (type-app) converted Lol from using proxies to type application.
+This means that instead of writing `proxy valueFact (Proxy::Proxy m)`,
+you instead write `valueFact @m`. Unfortunately, we can't quite do this everywhere
+due to RankNTypes in the Tensor DSL (and some weirdness with `withWitness`),
+so this branch is stalled.
+
+--------------------------------------------------------------------------------
+
 This repository contains several Haskell libraries:
 
   * The `lol` directory contains the Haskell library Λ ○ λ (Lol),
