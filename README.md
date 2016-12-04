@@ -1,3 +1,10 @@
+This branch (null-drbg) introduces a new (dummy) random generator so that we can
+meausre the performance impact of random sampling. Are our performance issues
+due to how we've structured our Haskell code, or simply due to really slow random
+generators?
+
+--------------------------------------------------------------------------------
+
 This repository contains several Haskell libraries:
 
   * The folder `lol` contains the Haskell library Λ ○ λ (Lol),
