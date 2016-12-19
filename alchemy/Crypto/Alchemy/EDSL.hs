@@ -1,9 +1,9 @@
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE GADTs             #-}
-{-# LANGUAGE KindSignatures    #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE RankNTypes        #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE TypeOperators         #-}
 
 module Crypto.Alchemy.EDSL where
 
@@ -28,14 +28,18 @@ class SymPT rep where
 
 -- | Symantics for ciphertext operations
 class SymCT rep where
-  addCT, mulCT :: (ct ~ CT m zp (Cyc t m' zq), 
+  -- CJP: would be nice to enforce that rep ct is Additive, Ring, but
+  -- this would seem to require entailment
+  addCT, mulCT :: (ct ~ CT m zp (Cyc t m' zq),
                    Eq zp, m `Divides` m', ToSDCtx t m' zp zq) =>
                   rep ct -> rep ct -> rep ct
 
   rescaleCT :: (RescaleCyc (Cyc t) zq zq', ToSDCtx t m' zp zq) =>
                rep (CT m zp (Cyc t m' zq)) -> rep (CT m zp (Cyc t m' zq'))
 
-  -- TODO: ksQuadCirc :: 
+  ksQuadCirc :: (ct ~ CT m zp (Cyc t m' zq),
+                 KeySwitchCtx gad t m' zp zq zq') =>
+                KSQuadCircHint gad (Cyc t m' zq') -> rep ct -> rep ct
 
 
 
