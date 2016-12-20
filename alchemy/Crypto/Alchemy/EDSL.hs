@@ -1,104 +1,98 @@
+{-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoImplicitPrelude     #-}
 {-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE UndecidableInstances  #-}
 
 module Crypto.Alchemy.EDSL where
 
--- import Data.Typeable
-
 import Crypto.Lol
-import Crypto.Lol.Applications.SymmSHE
-import Crypto.Lol.Cyclotomic.Tensor    (Tensor)
+-- why doesn't Lol export Tensor type?
+import Crypto.Lol.Cyclotomic.Tensor
 
-class Lambda rep where
-  lam :: (rep a -> rep b) -> rep (a -> b)
-  app :: rep (a -> b) -> rep a -> rep b
+import Data.Constraint
+
+class Lambda expr where
+  lam :: (expr a -> expr b) -> expr (a -> b)
+  app :: expr (a -> b) -> expr a -> expr b
+
+-- CJP: design question: do we go with stronger single-argument
+-- SymPT/CT classes, which support very general methods that must work
+-- for all m, m' etc., subject to constraints?  It then becomes a bit
+-- tricky to know what constraints are appropriate for arbitrary
+-- instances.  (We could define them on a per-instance basis as
+-- associated types, but this is uuuuugly.)
+--
+-- Or do we go with weaker classes that include m, m' etc. as
+-- arguments?  This makes it harder/impossible to define methods that
+-- "switch arguments" (like moduli).  One would have to define
+-- multiple classes that had all relevant arguments as parameters.
+
 
 -- | Symantics for plaintext operations.
 
-class SymPT rep where
-  litPT :: (rp ~ (Cyc t m zp), Tensor t, Fact m) => rep rp
+class SymPT (expr :: Factored -> * -> *) where
+  type SymPTElt expr zp :: Constraint -- yuck, but necessary?
 
-  addPT, mulPT :: (rp ~ (Cyc t m zp), Tensor t, Fact m) =>
-                  rep rp -> rep rp -> rep rp
+  -- type PTOf expr (m :: Factored) zp :: *
 
+  -- litPT :: PTOf expr m zp -> expr m zp
+
+  -- CJP: might be nicer to get these via entailment
+  addPT, mulPT :: (Fact m, SymPTElt expr zp) =>
+                  expr m zp -> expr m zp -> expr m zp
 
 -- | Symantics for ciphertext operations
-class SymCT rep where
-  -- CJP: would be nice to enforce that rep ct is Additive, Ring, but
-  -- this would seem to require entailment
-  addCT, mulCT :: (ct ~ CT m zp (Cyc t m' zq),
-                   Eq zp, m `Divides` m', ToSDCtx t m' zp zq) =>
-                  rep ct -> rep ct -> rep ct
+class SymCT expr where
 
-  rescaleCT :: (RescaleCyc (Cyc t) zq zq', ToSDCtx t m' zp zq) =>
-               rep (CT m zp (Cyc t m' zq)) -> rep (CT m zp (Cyc t m' zq'))
+  -- CJP: entailment?
+  addCT, mulCT :: (e ~ expr m' zq m zp, m `Divides` m') =>
+                  e -> e -> e
 
-  ksQuadCirc :: (ct ~ CT m zp (Cyc t m' zq),
+  {- How to handle RescaleCyc constraint? Associated constraint type instead?
+  rescaleCT :: (RescaleCyc (Cyc t) zq zq') =>
+               expr m zp m' zq -> expr m zp m' zq'
+
+  ksQuadCirc :: (ct ~ expr m zp m' zq,
                  KeySwitchCtx gad t m' zp zq zq') =>
-                KSQuadCircHint gad (Cyc t m' zq') -> rep ct -> rep ct
+                KSQuadCircHint gad (Cyc t m' zq') -> ct -> ct
+  -}
 
 
+-- | Metacircular evaluator (analogous to identity monad).
+newtype I a = I { unI :: a }
+
+-- | Metacircular lambda abstraction and application.
+instance Lambda I where
+  lam f = I $ unI . f . I
+  app (I f) (I a) = I $ f a
 
 
-{- OLD STUFF, HOPEFULLY NOT NEEDED -}
+-- | Naive plaintext evaluator.
+newtype EvalPT t m zp = EPT { unEPT :: Cyc t m zp }
 
-{-
+instance (Tensor t) => SymPT (EvalPT t) where
+  type SymPTElt (EvalPT t) zp = CElt t zp
 
--- | (nested) list of type representations for a list of types
-data Ctx :: * -> * where
-  CtxZ :: Ctx ()
-  CtxS :: Typeable a => Ctx ctx -> Ctx (a, ctx)
+  addPT (EPT a) (EPT b) = EPT $ a + b
+  mulPT (EPT a) (EPT b) = EPT $ a * b
 
--- | Peano representation of the position of a distinguished type in a
--- (nested) type list
-data Index :: * -> * -> * where
-  IndexZ :: Index (a, ctx) a
-  IndexS :: Index ctx a -> Index (b, ctx) a
+-- PROBLEM! Can't make EvalPT or (EvaltPT t) a meaningful instance of
+-- Lambda because the kinds don't meaningfully match up
 
-ctxLen :: Ctx a -> Int
-ctxLen CtxZ = 0
-ctxLen (CtxS ctx) = 1 + ctxLen ctx
+-- | Plaintext-to-ciphertext transformer.
+data PT2CT expr (m' :: Factored) zq (m :: Factored) zp where
+  P2C :: (m `Divides` m') => expr m' zq m zp -> PT2CT expr m' zq m zp
 
-tshift' :: Int -> Ctx j -> Ctx (a, i) -> Index j a
-tshift' _ CtxZ _ = error "tshift': impossible!"
-tshift' 0 (CtxS _) (CtxS _) = IndexZ
-tshift' n (CtxS c1) c2 = IndexS (tshift' (n-1) c1 c2)
+instance SymCT expr => SymPT (PT2CT expr m' zq) where
+  type SymPTElt (PT2CT expr m' zq) zp = () -- nothing needed?
 
-tshift :: Ctx j -> Ctx (a, i) -> Index j a
-tshift c1 c2 = tshift' (ctxLen c1 - ctxLen c2) c1 c2
+  addPT (P2C a) (P2C b) = P2C $ addCT a b
+  mulPT (P2C a) (P2C b) = P2C $ mulCT a b
 
--- | Plaintext expression (in de Bruijn form), parameterized by
--- (nested) list of types of the free variables, and type of the term
--- itself.
-data PTTerm :: * -> * -> * where
-  -- | plaintext literal
-  PTLit :: (a ~ Cyc t m r, Tensor t, Fact m) =>
-           a -> PTTerm ctx a
-
-  -- | plaintext addition
-  PTAdd :: (a ~ Cyc t m r, Tensor t, Fact m) =>
-           PTTerm ctx a -> PTTerm ctx a -> PTTerm ctx a
-
-  -- | plaintext multiplication
-  PTMul :: (a ~ Cyc t m r, Tensor t, Fact m) =>
-           PTTerm ctx a -> PTTerm ctx a -> PTTerm ctx a
-
-  -- | plaintext variable
-  PTVar :: Typeable a => Index ctx a -> PTTerm ctx a
-
-  -- | lambda
-  PTLam :: (Typeable a, Typeable b) =>
-           PTTerm (a, ctx) b -> PTTerm ctx (a -> b)
-
-  -- | apply lambda
-  PTApp :: (Typeable a, Typeable b) =>
-           PTTerm ctx (a -> b) -> PTTerm ctx a -> PTTerm ctx b
-
--- | typed de Bruijn term
-newtype PTT a = PTT { unPTT :: forall ctx . Ctx ctx -> PTTerm ctx a }
-
--}
