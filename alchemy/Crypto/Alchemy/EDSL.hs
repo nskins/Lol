@@ -101,19 +101,17 @@ instance SymPT I where
   addPT a b = I $ L $ unIL a + unIL b
   mulPT a b = I $ L $ unIL a * unIL b
 
-{- not needed if C is a GADT
-
-type family PT2CT (m' :: Factored) (qs :: [*]) a where
-  PT2CT m' qs (Level l (Cyc t m zp))  = CT m zp (Cyc t m' (Collect l qs))
-  PT2CT m' qs (a -> b)                = PT2CT m' qs a -> PT2CT m' qs b
-
--}
-
--- | Collect the first @n+1@ moduli into nested pairs of 'ZqBasic's,
--- representing a product ring
+-- | Collect the first @n+1@ moduli into a /reverse/ nested pair of
+-- 'ZqBasic's, representing a product ring.  (Reverse because we want
+-- to strip off the first element of an @n@-tuple to get the
+-- @(n-1)@-tuple.)
 type family ZqProd n qs where
-  ZqProd 'Z     (q ': _)  = (ZqBasic q Int64)
-  ZqProd ('S n) (q ': qs) = (ZqBasic q Int64, ZqProd n qs)
+  ZqProd 'Z     qs = (ZqBasic (Elt 'Z qs) Int64)
+  ZqProd ('S n) qs = (ZqBasic (Elt  n qs) Int64, ZqProd n qs)
+
+type family Elt n qs where
+  Elt 'Z     (q ': _)  = q
+  Elt ('S n) (_ ': qs) = Elt n qs
 
 -- | Plaintext to ciphertext compiler.
 data C
@@ -132,3 +130,6 @@ instance (SymCT ctexpr) => SymPT (C ctexpr m' qs) where
 
   -- need keyswitch too
   mulPT (CCT a) (CCT b) = CCT $ mulCT (rescaleCT a) (rescaleCT b)
+  -- CJP: somehow need to get (Reflects q Int64) constraints in scope
+  -- here so we can get Unbox instances for (ZqBasic (Elt l qs) Int64)
+  -- and/or (ZqProd l qs) ?
