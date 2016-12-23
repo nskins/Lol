@@ -1,29 +1,28 @@
-{-# LANGUAGE ConstraintKinds       #-}
-{-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE GADTs                 #-}
-{-# LANGUAGE KindSignatures        #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE NoImplicitPrelude     #-}
-{-# LANGUAGE PolyKinds             #-}
-{-# LANGUAGE RankNTypes            #-}
-{-# LANGUAGE TypeFamilies          #-}
-{-# LANGUAGE TypeOperators         #-}
-{-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE ConstraintKinds            #-}
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GADTs                      #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE KindSignatures             #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE NoImplicitPrelude          #-}
+{-# LANGUAGE PolyKinds                  #-}
+{-# LANGUAGE RankNTypes                 #-}
+{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE TypeOperators              #-}
+{-# LANGUAGE UndecidableInstances       #-}
 
 module Crypto.Alchemy.EDSL where
 
 import Crypto.Lol                      hiding (Pos (..))
 import Crypto.Lol.Applications.SymmSHE
-import Crypto.Lol.Types
 
--- not using TypeLits because they don't seem to be a good fit (no
--- Peano rep)
+import Algebra.Additive as Additive (C)
+import Algebra.Ring     as Ring (C)
 
---import Data.Promotion.Prelude
---import Data.Singletons.TypeLits
-
-import Data.Type.Natural
+import Data.Constraint
+import Data.Type.Natural hiding ((:-), zero)
 
 -- | Lambda abstraction and application.
 
@@ -35,101 +34,137 @@ class Lambda expr where
   app :: expr (a -> b) -> expr a -> expr b
 
 
-data Level (l :: Nat) a = L { unL :: a }
-
-
 -- | Lambda abstraction and application for leveled computations.
 
-class LambdaL expr where
-  -- | Abstract a Haskell function that takes a leveled input.
-  lamL :: (expr (Level l a) -> expr b) -> expr (Level l a -> b)
+class LambdaD expr where
+  -- | Abstract.
+  lamD :: (expr da a -> expr db b) -> expr (da,db) (a -> b)
 
-  -- | Apply an abstraction.
-  appL :: expr (Level l a -> b) -> expr (Level l a) -> expr b
+  -- | Apply.
+  appD :: expr (da,db) (a -> b) -> expr da a -> expr db b
 
 
--- | Symantics for leveled plaintext operations.
+-- | Symantics for leveled plaintext operations of some depth @d@.
 
 class SymPT expr where
 
-  -- | Plaintext addition.  Inputs must be at the same level as
-  -- outputs.
-  addPT :: ( -- (l :<= l1) ~ 'True, (l :<= l2) ~ 'True,
-           -- CJP: generalize input levels?
-            rp ~ Cyc t m zp, Fact m, CElt t zp) =>
-           expr (Level l rp) -> expr (Level l rp) -> expr (Level l rp)
+  -- | Entailment of additive group structure.  (Addends must be at
+  -- the same depth as output.)
 
-  -- | Plaintext multiplication.  Inputs must be one level higher than
-  -- output.
-  mulPT :: ( -- (l :< l1) ~ 'True, (l :< l2) ~ 'True,
-           -- CJP: generalize input levels?
-            rp ~ Cyc t m zp, Fact m, CElt t zp) =>
-           expr (Level ('S l) rp) -> expr (Level ('S l) rp) -> expr (Level l rp)
+  entailAdditiveSymPT :: (rp ~ Cyc t m zp)
+                      => Tagged (expr d rp)
+                         ((Additive rp) :- Additive (expr d rp))
+
+  -- | Plaintext multiplication.  Inputs must be one depth less than
+  -- output (so we can't use 'Ring').
+
+  -- CJP: generalize input depths?
+  mulPT :: (rp ~ Cyc t m zp, Fact m, CElt t zp) =>
+           expr d rp -> expr d rp -> expr ('S d) rp
 
 
--- CJP: should the following be leveled as well?  Don't think we need
--- it here.
-
--- | Symantics for ciphertext operations
+-- | Symantics for ciphertext operations.
 
 class SymCT expr where
 
-  addCT, mulCT :: (ct ~ CT m zp (Cyc t m' zq)) =>
-                  expr ct -> expr ct -> expr ct
+  -- | Entailment of ring structure.
+  entailRingSymCT :: Tagged (expr ct)
+                     ((Ring ct) :- Ring (expr ct))
 
-  rescaleCT :: (RescaleCyc (Cyc t) (a,b) b, ToSDCtx t m' zp (a,b)) =>
-               expr (CT m zp (Cyc t m' (a,b))) -> expr (CT m zp (Cyc t m' b))
+  rescaleCT :: (RescaleCyc (Cyc t) zq' zq, ToSDCtx t m' zp zq') =>
+               -- above constraints copied from rescaleLinearCT
+               expr (CT m zp (Cyc t m' zq')) -> expr (CT m zp (Cyc t m' zq))
+
+
 
 -- | Metacircular evaluator.
 newtype I a = I { unI :: a }
+  deriving (Eq, Show, Additive.C, Ring.C)
 
--- | Metacircular lambda abstraction and application.
+-- | Metacircular lambda.
 instance Lambda I where
   lam f   = I $ unI . f . I
-  app f a = I $ unI f (unI a)
+  app f a = I $ unI f $ unI a
 
--- | Metacircular lambda abstraction and application.
-instance LambdaL I where
-  lamL f   = I $ unI . f . I
-  appL f a = I $ unI f (unI a)
+-- | Metacircular ciphertext symantics.
+instance SymCT I where
+  entailRingSymCT = tag $ Sub Dict
+  rescaleCT = I . rescaleLinearCT . unI
 
-unIL :: I (Level l a) -> a
-unIL = unL . unI
 
--- | Metacircular ring operations.
-instance SymPT I where
-  addPT a b = I $ L $ unIL a + unIL b
-  mulPT a b = I $ L $ unIL a * unIL b
 
--- | Collect the first @n+1@ moduli into a /reverse/ nested pair of
--- 'ZqBasic's, representing a product ring.  (Reverse because we want
--- to strip off the first element of an @n@-tuple to get the
--- @(n-1)@-tuple.)
-type family ZqProd n qs where
-  ZqProd 'Z     qs = (ZqBasic (Elt 'Z qs) Int64)
-  ZqProd ('S n) qs = (ZqBasic (Elt  n qs) Int64, ZqProd n qs)
+-- | Metacircular evaluator with depth.
+newtype ID d a = ID { unID :: a }
+  deriving (Eq, Show, Additive.C, Ring.C)
 
-type family Elt n qs where
-  Elt 'Z     (q ': _)  = q
-  Elt ('S n) (_ ': qs) = Elt n qs
+-- | Metacircular lambda with depth.
+instance LambdaD ID where
+  lamD f   = ID $ unID . f . ID
+  appD f a = ID $ unID f $ unID a
+
+-- | Metacircular plaintext symantics.
+instance SymPT ID where
+  entailAdditiveSymPT = tag $ Sub Dict
+  mulPT a b = ID $ unID a * unID b
+
+
+-- | Encodes a sequence of @Z_q@ types, with needed constraints, for
+-- depth-@d@ computations. (The exposed type @zq@ is the one used at
+-- depth @d@.)
+data Zqs t zp d zq where
+  ZqZ :: (Encode zq zp) => Zqs t zp 'Z zq
+
+  ZqS :: (RescaleCyc (Cyc t) zq' zq,
+          Encode zp zq', CElt t zq') -- ToSDCtx minus Fact m'
+      => Zqs t zp d zq' -> Zqs t zp ('S d) zq
+
+
+-- CJP: make sure all the constraints in the GADT, functions, and
+-- instances below make logical sense.  Some are weird and I don't
+-- yet see whether there are better alternatives.
+
 
 -- | Plaintext to ciphertext compiler.
-data C
-  ctexpr -- ^ symantics of target ciphertext expression
-  m'     -- ^ ciphertext index
-  qs     -- ^ typelist of individual moduli
-  a      -- ^ type of the plaintext expression
+data PT2CT              -- GHC wants complete kind signature for polymorphism
+  (ctexpr :: * -> *)    -- ^ symantics of target ciphertext expression
+  (m' :: Factored)      -- ^ ciphertext index (move to function arg?)
+  (d :: k)              -- ^ depth of computation
+  (a :: *)              -- ^ type of the plaintext expression
   where
-    CCT  :: ctexpr (CT m zp (Cyc t m' (ZqProd l qs)))
-         -> C ctexpr m' qs (Level l (Cyc t m zp))
-    CLam :: (C ctexpr m' qs a -> C ctexpr m' qs b)
-         -> C ctexpr m' qs (a -> b)
+    P2CTerm  :: (m `Divides` m', Eq zp) => -- Eq to get Ring for CT over Rq
+                (forall zq ct . (ct ~ CT m zp (Cyc t m' zq), Ring ct) =>
+                 Zqs t zp d zq -> ctexpr ct)
+             -> PT2CT ctexpr m' d (Cyc t m zp)
 
-instance (SymCT ctexpr) => SymPT (C ctexpr m' qs) where
-  addPT (CCT a) (CCT b) = CCT $ addCT a b
+    P2CLam :: (PT2CT ctexpr m' d a -> PT2CT ctexpr m' d b)
+           -> PT2CT ctexpr m' (da,db) (a -> b)
 
-  -- need keyswitch too
-  mulPT (CCT a) (CCT b) = CCT $ mulCT (rescaleCT a) (rescaleCT b)
-  -- CJP: somehow need to get (Reflects q Int64) constraints in scope
-  -- here so we can get Unbox instances for (ZqBasic (Elt l qs) Int64)
-  -- and/or (ZqProd l qs) ?
+-- CJP: want a conversion that works for both Term and Lam.  How to
+-- write the type signature for it?
+
+-- | Convert from 'SymPT' to 'SymCT' (using 'PT2CT').
+pt2CT :: (ct ~ CT m zp (Cyc t m' zq), Ring ct)
+      => PT2CT ctexpr m' d (Cyc t m zp)
+      -> Zqs t zp d zq
+      -> ctexpr (CT m zp (Cyc t m' zq))
+pt2CT (P2CTerm f) zqs = f zqs
+
+instance (SymCT ctexpr, rp ~ Cyc t m zp)
+  => Additive.C (PT2CT ctexpr m' d rp) where
+
+  -- zero = P2CTerm (\zqs -> zero \\ witness entailRingSymCT zero)
+
+  (P2CTerm a) + (P2CTerm b) = P2CTerm (\zqs -> (a zqs) + (b zqs)
+                                        \\ witness entailRingSymCT (a zqs))
+
+  negate (P2CTerm a) = P2CTerm (\zqs -> negate (a zqs)
+                                 \\ witness entailRingSymCT (a zqs))
+
+instance (SymCT ctexpr) => SymPT (PT2CT ctexpr m') where
+  entailAdditiveSymPT = tag $ Sub Dict
+
+  -- still needs keyswitch
+  mulPT (P2CTerm a) (P2CTerm b) =
+    P2CTerm (\(ZqS zqs) -> let a' = rescaleCT (a zqs)
+                               b' = rescaleCT (b zqs)
+                           in a' * b' \\ witness entailRingSymCT a')
