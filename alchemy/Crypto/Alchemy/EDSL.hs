@@ -144,9 +144,10 @@ data PT2CT              -- GHC wants complete kind signature for polykindedness
   (a :: *)              -- ^ type of the plaintext expression
   :: *
   where
-    P2CTerm  :: (forall proxy m' zq ct .
-                 (m `Divides` m', ct ~ CT m zp (Cyc t m' zq), Ring ct) =>
-                 -- CJP: why Ring ct?  w/o it, weird compile errors
+    P2CTerm  :: (Eq zp) =>      -- remove when SHE Additive CT instance fixed
+                (forall proxy m' zq ct .
+                 (m `Divides` m', ct ~ CT m zp (Cyc t m' zq),
+                  Ring ct) => -- CJP: why Ring ct?  w/o it, weird compile errors
                   proxy m' -> Zqs t zp d zq -> ctexpr ct)
              -> PT2CT ctexpr d (Cyc t m zp)
 
