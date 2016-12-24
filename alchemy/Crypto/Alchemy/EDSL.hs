@@ -48,19 +48,33 @@ class LambdaD expr where
 
 class SymPT expr where
 
+  {- CJP: scrapping entailment here for the subtle reason that in the
+ PT-to-CT compiler, the Additive instance for CT needs a weird extra
+ constraint (namely, Eq zp) that shouldn't be exposed here.  But
+ leaving it out makes it impossible to implement 'zero', and hence to
+ construct the entailment.  Also, since we need a depth-aware
+ multiplication operator, might as well have similar ones for
+ addition/subtraction.
+
   -- | Entailment of additive group structure.  (Addends must be at
   -- the same depth as output.)
 
   entailAdditiveSymPT :: (rp ~ Cyc t m zp)
                       => Tagged (expr d rp)
                          ((Additive rp) :- Additive (expr d rp))
+  -}
+
+
+  (+#), (-#) :: (rp ~ Cyc t m zp, Fact m, CElt t zp) =>
+                -- CJP: generalize input depths?
+                expr d rp -> expr d rp -> expr d rp
 
   -- | Plaintext multiplication.  Inputs must be one depth less than
   -- output (so we can't use 'Ring').
 
-  -- CJP: generalize input depths?
-  mulPT :: (rp ~ Cyc t m zp, Fact m, CElt t zp) =>
-           expr d rp -> expr d rp -> expr ('S d) rp
+  (*#) :: (rp ~ Cyc t m zp, Fact m, CElt t zp) =>
+          -- CJP: generalize input depths?
+          expr d rp -> expr d rp -> expr ('S d) rp
 
 
 -- | Symantics for ciphertext operations.
@@ -104,8 +118,7 @@ instance LambdaD ID where
 
 -- | Metacircular plaintext symantics.
 instance SymPT ID where
-  entailAdditiveSymPT = tag $ Sub Dict
-  mulPT a b = ID $ unID a * unID b
+  a *# b = ID $ unID a * unID b
 
 
 -- | Encodes a sequence of @Z_q@ types, with needed constraints, for
@@ -125,46 +138,65 @@ data Zqs t zp d zq where
 
 
 -- | Plaintext to ciphertext compiler.
-data PT2CT              -- GHC wants complete kind signature for polymorphism
+data PT2CT              -- GHC wants complete kind signature for polykindedness
   (ctexpr :: * -> *)    -- ^ symantics of target ciphertext expression
-  (m' :: Factored)      -- ^ ciphertext index (move to function arg?)
   (d :: k)              -- ^ depth of computation
   (a :: *)              -- ^ type of the plaintext expression
+  :: *
   where
-    P2CTerm  :: (m `Divides` m', Eq zp) => -- Eq to get Ring for CT over Rq
-                (forall zq ct . (ct ~ CT m zp (Cyc t m' zq), Ring ct) =>
-                 Zqs t zp d zq -> ctexpr ct)
-             -> PT2CT ctexpr m' d (Cyc t m zp)
+    P2CTerm  :: (forall proxy m' zq ct .
+                 (m `Divides` m', ct ~ CT m zp (Cyc t m' zq), Ring ct) =>
+                 -- CJP: why Ring ct?  w/o it, weird compile errors
+                  proxy m' -> Zqs t zp d zq -> ctexpr ct)
+             -> PT2CT ctexpr d (Cyc t m zp)
 
-    P2CLam :: (PT2CT ctexpr m' d a -> PT2CT ctexpr m' d b)
-           -> PT2CT ctexpr m' (da,db) (a -> b)
+    P2CLam :: (PT2CT ctexpr da a -> PT2CT ctexpr db b)
+           -> PT2CT ctexpr (da,db) (a -> b)
 
 -- CJP: want a conversion that works for both Term and Lam.  How to
 -- write the type signature for it?
 
 -- | Convert from 'SymPT' to 'SymCT' (using 'PT2CT').
-pt2CT :: (ct ~ CT m zp (Cyc t m' zq), Ring ct)
-      => PT2CT ctexpr m' d (Cyc t m zp)
+pt2CT :: (m `Divides` m', ct ~ CT m zp (Cyc t m' zq), Ring ct)
+      => PT2CT ctexpr d (Cyc t m zp)
+      -> proxy m'
       -> Zqs t zp d zq
       -> ctexpr (CT m zp (Cyc t m' zq))
-pt2CT (P2CTerm f) zqs = f zqs
+pt2CT (P2CTerm f) p zqs = f p zqs
 
-instance (SymCT ctexpr, rp ~ Cyc t m zp)
-  => Additive.C (PT2CT ctexpr m' d rp) where
+instance (SymCT ctexpr) => SymPT (PT2CT ctexpr) where
 
-  -- zero = P2CTerm (\zqs -> zero \\ witness entailRingSymCT zero)
+  (P2CTerm a) +# (P2CTerm b) =
+    P2CTerm (\p zqs -> let a' = a p zqs
+                           b' = b p zqs
+                       in a' + b' \\ witness entailRingSymCT a')
 
-  (P2CTerm a) + (P2CTerm b) = P2CTerm (\zqs -> (a zqs) + (b zqs)
-                                        \\ witness entailRingSymCT (a zqs))
-
-  negate (P2CTerm a) = P2CTerm (\zqs -> negate (a zqs)
-                                 \\ witness entailRingSymCT (a zqs))
-
-instance (SymCT ctexpr) => SymPT (PT2CT ctexpr m') where
-  entailAdditiveSymPT = tag $ Sub Dict
+  (P2CTerm a) -# (P2CTerm b) =
+    P2CTerm (\p zqs -> let a' = a p zqs
+                           b' = b p zqs
+                       in a' - b' \\ witness entailRingSymCT a')
 
   -- still needs keyswitch
-  mulPT (P2CTerm a) (P2CTerm b) =
-    P2CTerm (\(ZqS zqs) -> let a' = rescaleCT (a zqs)
-                               b' = rescaleCT (b zqs)
-                           in a' * b' \\ witness entailRingSymCT a')
+  (P2CTerm a) *# (P2CTerm b) =
+    P2CTerm (\p (ZqS zqs) -> let a' = rescaleCT (a p zqs)
+                                 b' = rescaleCT (b p zqs)
+                             in a' * b' \\ witness entailRingSymCT a')
+
+instance LambdaD (PT2CT ctexpr) where
+  lamD = P2CLam
+  appD (P2CLam f) = f
+
+
+
+
+
+
+
+{- CJP: vestigial from we had entailAdditiveSymPT
+instance (SymCT ctexpr, Eq zp)
+  => Additive.C (PT2CT ctexpr (d :: Nat) (Cyc t m zp)) where
+
+  negate (P2CTerm a) = P2CTerm (\p zqs -> negate (a p zqs)
+                                 \\ witness entailRingSymCT (a p zqs))
+-}
+
