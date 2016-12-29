@@ -83,7 +83,7 @@ class SymCT expr where
 
   -- | Entailment of ring structure.
   entailRingSymCT :: Tagged (expr ct)
-                     ((Ring ct) :- Ring (expr ct))
+                     (Ring ct :- Ring (expr ct))
 
   rescaleCT :: (RescaleCyc (Cyc t) zq' zq, ToSDCtx t m' zp zq') =>
                -- above constraints copied from rescaleLinearCT
@@ -165,7 +165,7 @@ pt2CT :: (m `Divides` m', ct ~ CT m zp (Cyc t m' zq), Ring ct)
       -> proxy m'
       -> Zqs t zp d zq
       -> ctexpr (CT m zp (Cyc t m' zq))
-pt2CT (P2CTerm f) p zqs = f p zqs
+pt2CT (P2CTerm f) = f
 
 instance (SymCT ctexpr) => SymPT (PT2CT ctexpr) where
 
