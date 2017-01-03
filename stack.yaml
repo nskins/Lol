@@ -55,7 +55,7 @@ packages:
 extra-deps:
 
 # - aeson-0.11.2.0  # CJP: 'stack init' added this, but builds fine without
-
+- constraints-0.8
 - non-negative-0.1.1
 - numeric-prelude-0.4.2
 - tagged-transformer-0.8
