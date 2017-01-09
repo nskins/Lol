@@ -97,7 +97,7 @@ bench_lInv = bench adviseDec  . advisePow
 {-# INLINE bench_liftPow #-}
 -- lift an element in the Pow basis
 bench_liftPow :: _ => Cyc t m r -> Bench '(t,m,r)
-bench_liftPow = bench (liftCyc Pow) . advisePow
+bench_liftPow = bench (liftPow) . advisePow
 
 {-# INLINABLE bench_mulgPow #-}
 -- multiply by g when input is in Pow basis

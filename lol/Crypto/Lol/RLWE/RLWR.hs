@@ -9,6 +9,7 @@
 module Crypto.Lol.RLWE.RLWR where
 
 import Crypto.Lol
+import Crypto.Lol.Cyclotomic.UCyc
 
 import Control.Monad.Random
 
@@ -17,7 +18,7 @@ type Sample t m zq zp = (Cyc t m zq, Cyc t m zp)
 
 -- | Common constraints for working with RLWR.
 type RLWRCtx t m zq zp =
-  (Fact m, Ring zq, RescaleCyc (Cyc t) zq zp, CElt t zq, CElt t zp)
+  (Fact m, Ring zq, Rescale (UCyc t m D zq) (UCyc t m D zp), CElt t zq, CElt t zp)
 
 -- | An RLWR sample with the given secret.
 sample :: (RLWRCtx t m zq zp, Random zq, MonadRandom rnd)
@@ -30,5 +31,5 @@ sample s = let s' = adviseCRT s in do
 -- produced by rounding \(a\cdot s\) in the decoding basis.
 roundedProd :: (RLWRCtx t m zq zp) => Cyc t m zq -> Cyc t m zq -> Cyc t m zp
 {-# INLINABLE roundedProd #-}
-roundedProd s = let s' = adviseCRT s in \a -> rescaleCyc Dec $ a * s'
+roundedProd s = let s' = adviseCRT s in \a -> rescaleDec $ a * s'
 

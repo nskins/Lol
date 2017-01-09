@@ -188,7 +188,7 @@ prop_modSwPT pt sk = testIO $ do
       x = decryptUnrestricted sk z
       y' = modSwitchPT z :: CT m zp' (Cyc t m' zq)
       x'' = decryptUnrestricted sk y'
-  return $ x'' == rescaleCyc Dec x
+  return $ x'' == rescaleDec x
 
 prop_ksLin :: forall t m m' z zp (zq :: *) (zq' :: *) (gad :: *) . (z ~ LiftOf zp, _)
   => PT (Cyc t m zp) -> SK (Cyc t m' z) -> SK (Cyc t m' z) -> Test '(t,m,m',zp,zq,zq',gad)

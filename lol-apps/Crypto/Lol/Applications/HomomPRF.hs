@@ -137,11 +137,11 @@ type instance Div2 (ZqBasic q i) = ZqBasic (Div2 q) i
 type instance Div2 (pp :: PrimePower) = Head (UnF (PpToF pp / F2))
 
 -- type-restricted versions of rescaleLinearCT
-roundCTUp :: (RescaleCyc (Cyc t) zq (ZqUp zq zqs), ToSDCtx t m' zp zq)
+roundCTUp :: (RescaleCtx t m' zp zq (ZqUp zq zqs))
   => Proxy zqs -> CT m zp (Cyc t m' zq) -> CT m zp (Cyc t m' (ZqUp zq zqs))
 roundCTUp _ = rescaleLinearCT
 
-roundCTDown :: (RescaleCyc (Cyc t) zq (ZqDown zq zqs), ToSDCtx t m' zp zq)
+roundCTDown :: (RescaleCtx t m' zp zq (ZqDown zq zqs))
   => Proxy zqs -> CT m zp (Cyc t m' zq) -> CT m zp (Cyc t m' (ZqDown zq zqs))
 roundCTDown _ = rescaleLinearCT
 
@@ -231,7 +231,7 @@ instance (UnPP p ~ '(Prime2, 'S e),                                             
           KeySwitchCtx gad t m' zp zq zqup, KSHintCtx gad t m' z zqup,              -- for quadratic key switch
           Reflects p Int,                                                           -- value
           Ring (CT m zp (Cyc t m' zq)),                                             -- (*)
-          RescaleCyc (Cyc t) zq zq', ToSDCtx t m' zp zq,                            -- rescaleLinearCT
+          RescaleCtx t m' zp zq zq',                                                -- rescaleLinearCT
           ModSwitchPTCtx t m' zp zp' zq',                                           -- modSwitchPT
           PTRound t m m' e zp' zq' z gad zqs,                                       -- recursive call
           Protoable (KSQuadCircHint gad (Cyc t m' (ZqUp zq zqs))))                  -- toProto
@@ -400,9 +400,9 @@ instance (ExtendLinIdx e r s e' r' s', -- tunnelInfoChain
 
 -- | Context for multi-step homomorphic tunneling.
 type MultiTunnelCtx rngs r r' s s' t z zp zq gad zqs =
-  (Head rngs ~ '(r,r'), Last rngs ~ '(s,s'), Tunnel rngs t zp (ZqUp zq zqs) gad, ZqDown (ZqUp zq zqs) zqs ~ zq,
-   RescaleCyc (Cyc t) zq (ZqUp zq zqs), RescaleCyc (Cyc t) (ZqUp zq zqs) zq, RescaleCyc (Cyc t) zq (ZqDown zq zqs),
-   ToSDCtx t r' zp zq, ToSDCtx t s' zp (ZqUp zq zqs))
+  (Head rngs ~ '(r,r'), Last rngs ~ '(s,s'), Tunnel rngs t zp (ZqUp zq zqs) gad,
+   ZqDown (ZqUp zq zqs) zqs ~ zq, RescaleCtx t r' zp zq (ZqUp zq zqs),
+   RescaleCtx t s' zp (ZqUp zq zqs) zq, RescaleCtx t s' zp zq (ZqDown zq zqs))
 
 -- EAC: why round down twice? We bump the modulus up to begin with to handle
 -- the key switches, so we knock thatt off, then another for accumulated noise

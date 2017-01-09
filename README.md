@@ -1,4 +1,16 @@
-This branch (master) was previously known as 'split-packages'. The main problem preventing us from creating a new Hackage release based on this branch is that microbenchmark performance is severely degraded relative to the fast-microbenechmarks branch.
+This branch (no-rescale-cyc) is a fork of master that attempts to remove the
+accursed 'RescaleCyc' class. I got pretty close; the only part I'm unable to fix
+is due to the interaction between overlapping instances and the 'Sub' constructor
+for 'Cyc'. The problem is this: I moved the overlapping instances of
+'RescaleCyc (Cyc t)' to overlapping 'Rescale (UCyc P/D)' instances. This is pretty
+natural. The problem is that with overlapping instances, you are *required*
+to write the constraint 'Rescale (UCyc t m P zq) (UCyc t m P zq')' on 'Cyc.rescalePow'.
+However, we need a constraint w.r.t some hidden index 'l' when we recurse in the
+'Sub' case. One solution is to force an embed, but this is a pretty hefty price.
+On the other hand, it lets us get rid of RescaleCyc!
+
+The constraints get annoying since they involve UCyc; it would probably be best
+to export constraint synonyms for rescalePow/rescaleDec from Cyc.
 
 --------------------------------------------------------------------------------
 

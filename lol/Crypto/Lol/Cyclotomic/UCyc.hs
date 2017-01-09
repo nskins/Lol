@@ -279,14 +279,38 @@ instance (Lift' r, Tensor t, Fact m, TElt t r, TElt t (LiftOf r))
 
 -- CJP: no Lift' for C because CRT basis may not exist for target type
 
-instance (Rescale a b, Tensor t, Fact m, TElt t a, TElt t b)
+instance {-# OVERLAPS #-} (Rescale a b, Tensor t, Fact m, TElt t a, TElt t b)
          => Rescale (UCyc t m P a) (UCyc t m P b) where
   rescale (Pow v) = Pow $ fmapT rescale v
   {-# INLINABLE rescale #-}
 
-instance (Rescale a b, Tensor t, Fact m, TElt t a, TElt t b)
+instance {-# OVERLAPS #-} (Rescale a b, Tensor t, Fact m, TElt t a, TElt t b)
          => Rescale (UCyc t m D a) (UCyc t m D b) where
   rescale (Dec v) = Dec $ fmapT rescale v
+  {-# INLINABLE rescale #-}
+
+-- | specialized instance for product rings of \(\Z_q\)s: ~2x faster
+-- algorithm
+instance (Tensor t, Fact m, TElt t (a,b), TElt t a, TElt t b, TElt t (LiftOf a),
+          Mod a, Lift' a, Reduce (LiftOf a) b, Reduce (ModRep a) b, Field b)
+         => Rescale (UCyc t m P (a,b)) (UCyc t m P b) where
+
+  rescale c = let aval = proxy modulus (Proxy::Proxy a)
+                  (a,b) = unzipPow c
+                  z = lift a
+              in (recip (reduce aval) :: b) LP.*> (b - reduce z)
+  {-# INLINABLE rescale #-}
+
+-- | specialized instance for product rings of \(\Z_q\)s: ~2x faster
+-- algorithm
+instance (Tensor t, Fact m, TElt t (a,b), TElt t a, TElt t b, TElt t (LiftOf a),
+          Mod a, Lift' a, Reduce (LiftOf a) b, Reduce (ModRep a) b, Field b)
+         => Rescale (UCyc t m D (a,b)) (UCyc t m D b) where
+
+  rescale c = let aval = proxy modulus (Proxy::Proxy a)
+                  (a,b) = unzipDec c
+                  z = lift a
+              in (recip (reduce aval) :: b) LP.*> (b - reduce z)
   {-# INLINABLE rescale #-}
 
 -- CJP: no Rescale for C because CRT basis may not exist for target

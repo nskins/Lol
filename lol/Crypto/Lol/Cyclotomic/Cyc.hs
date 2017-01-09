@@ -44,13 +44,13 @@ module Crypto.Lol.Cyclotomic.Cyc
 , cycPow, cycDec, cycCRT, cycCRTC, cycCRTE, cycPC, cycPE
 , uncycPow, uncycDec, uncycCRT, unzipCyc
 -- * Core cyclotomic operations
-, mulG, divG, gSqNorm, liftCyc, liftPow, liftDec
+, mulG, divG, gSqNorm, liftPow, liftDec, rescalePow, rescaleDec
 -- * Representation advice
 , advisePow, adviseDec, adviseCRT
 -- * Error sampling
 , tGaussian, errorRounded, errorCoset
 -- * Sub/extension rings
-, embed, twace, coeffsCyc, coeffsPow, coeffsDec, powBasis, crtSet
+, embed, twace, coeffsPow, coeffsDec, powBasis, crtSet
 ) where
 
 import qualified Algebra.Additive     as Additive (C)
@@ -63,7 +63,7 @@ import Crypto.Lol.Cyclotomic.UCyc hiding (coeffsDec, coeffsPow, crtSet,
                                    powBasis, tGaussian)
 
 import           Crypto.Lol.CRTrans
-import qualified Crypto.Lol.Cyclotomic.RescaleCyc as R
+--import qualified Crypto.Lol.Cyclotomic.RescaleCyc as R
 import           Crypto.Lol.Cyclotomic.Tensor     (TElt, Tensor)
 import qualified Crypto.Lol.Cyclotomic.UCyc       as U
 import           Crypto.Lol.Gadget
@@ -410,22 +410,17 @@ twace (Scalar u) = Scalar u
 twace (Sub (c :: Cyc t l r)) = Sub (twace c :: Cyc t (FGCD l m) r)
                                \\ gcdDivides (Proxy::Proxy l) (Proxy::Proxy m)
 
--- | Return the given element's coefficient vector with respect to
--- the (relative) powerful/decoding basis of the cyclotomic
--- extension \(\O_{m'} / \O_m\).
--- See also 'coeffsPow', 'coeffsDec'.
-coeffsCyc :: (m `Divides` m', CElt t r) => R.Basis -> Cyc t m' r -> [Cyc t m r]
-{-# INLINABLE coeffsCyc #-}
-coeffsCyc R.Pow c' = Pow <$> U.coeffsPow (uncycPow c')
-coeffsCyc R.Dec c' = Dec <$> U.coeffsDec (uncycDec c')
-
 coeffsPow, coeffsDec :: (m `Divides` m', CElt t r) => Cyc t m' r -> [Cyc t m r]
 {-# INLINABLE coeffsPow #-}
 {-# INLINABLE coeffsDec #-}
--- | Specialized version of 'coeffsCyc' for powerful basis.
-coeffsPow = coeffsCyc R.Pow
--- | Specialized version of 'coeffsCyc' for decoding basis.
-coeffsDec = coeffsCyc R.Dec
+-- | Return the given element's coefficient vector with respect to
+-- the (relative) powerful basis of the cyclotomic
+-- extension \(\O_{m'} / \O_m\).
+coeffsPow c' = Pow <$> U.coeffsPow (uncycPow c')
+-- | Return the given element's coefficient vector with respect to
+-- the (relative) decoding basis of the cyclotomic
+-- extension \(\O_{m'} / \O_m\).
+coeffsDec c' = Dec <$> U.coeffsDec (uncycDec c')
 
 -- | The relative powerful basis of \(\O_{m'} / \O_m\).
 powBasis :: (m `Divides` m', CElt t r) => Tagged m [Cyc t m' r]
@@ -452,14 +447,6 @@ instance (Reduce a b, Fact m, CElt t a, CElt t b)
   reduce (Sub (c :: Cyc t l a)) = Sub (reduce c :: Cyc t l b)
 
 type instance LiftOf (Cyc t m r) = Cyc t m (LiftOf r)
-
--- | Lift using the specified basis.
-liftCyc :: (Lift b a, Fact m, TElt t a, CElt t b)
-           => R.Basis -> Cyc t m b -> Cyc t m a
-{-# INLINABLE liftCyc #-}
-
-liftCyc R.Pow = liftPow
-liftCyc R.Dec = liftDec
 
 liftPow, liftDec :: (Lift b a, Fact m, TElt t a, CElt t b)
                     => Cyc t m b -> Cyc t m a
@@ -489,35 +476,22 @@ unzipCyc (CRT u) = either ((cycPE *** cycPE) . unzipCRTE)
 unzipCyc (Scalar c) = Scalar *** Scalar $ c
 unzipCyc (Sub c) = Sub *** Sub $ unzipCyc c
 
-instance {-# OVERLAPS #-} (Rescale a b, CElt t a, TElt t b)
-    => R.RescaleCyc (Cyc t) a b where
+-- Optimized for subring constructors, for powerful basis.
+-- | Rescale in the powerful basis.
+rescalePow :: (Rescale (UCyc t m P a) (UCyc t m P b), Rescale a b, Fact m, UCRTElt t a, ZeroTestable a)
+  => Cyc t m a -> Cyc t m b
+rescalePow (Scalar c) = Scalar $ rescale c
+rescalePow (Sub c) = Sub $ rescalePow c
+rescalePow (Pow c) = Pow $ rescale c
+rescalePow x = rescalePow $ toPow' x
 
-  -- Optimized for subring constructors, for powerful basis.
-  -- Analogs for decoding basis are not quite correct, because (* -1)
-  -- doesn't commute with 'rescale' due to tiebreakers!
-  rescaleCyc R.Pow (Scalar c) = Scalar $ rescale c
-  rescaleCyc R.Pow (Sub c) = Sub $ R.rescalePow c
-
-  rescaleCyc R.Pow c = Pow $ fmapPow rescale $ uncycPow c
-  rescaleCyc R.Dec c = Dec $ fmapDec rescale $ uncycDec c
-  {-# INLINABLE rescaleCyc #-}
-
--- | specialized instance for product rings of \(\Z_q\)s: ~2x faster
--- algorithm
-instance (Mod a, Field b, Lift a (ModRep a), Reduce (LiftOf a) b,
-         CElt t (a,b), CElt t a, CElt t b, CElt t (LiftOf a))
-         => R.RescaleCyc (Cyc t) (a,b) b where
-
-  -- optimized for subrings and powerful basis (see comments in other
-  -- instance for why this doesn't work for decoding basis)
-  rescaleCyc R.Pow (Scalar c) = Scalar $ rescale c
-  rescaleCyc R.Pow (Sub c) = Sub $ R.rescalePow c
-
-  rescaleCyc bas c = let aval = proxy modulus (Proxy::Proxy a)
-                         (a,b) = unzipCyc c
-                         z = liftCyc bas a
-                     in Scalar (recip (reduce aval)) * (b - reduce z)
-  {-# INLINABLE rescaleCyc #-}
+-- Analog optimizations for decoding basis are not quite correct, because (* -1)
+-- doesn't commute with 'rescale' due to tiebreakers!
+-- | Rescale in the decoding basis.
+rescaleDec :: (Rescale (UCyc t m D a) (UCyc t m D b), Fact m, UCRTElt t a, ZeroTestable a)
+  => Cyc t m a -> Cyc t m b
+rescaleDec (Dec c) = Dec $ rescale c
+rescaleDec x = rescaleDec $ toDec' x
 
 -- | promoted from base ring
 instance (Gadget gad zq, Fact m, CElt t zq) => Gadget gad (Cyc t m zq) where

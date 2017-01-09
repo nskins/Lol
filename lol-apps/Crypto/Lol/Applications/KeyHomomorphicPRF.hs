@@ -21,6 +21,7 @@ import Control.Monad.Random hiding (fromList)
 import Control.Monad.State
 
 import Crypto.Lol
+import Crypto.Lol.Cyclotomic.UCyc
 
 import Data.Bits
 import Data.Maybe (fromMaybe)
@@ -155,20 +156,20 @@ latticePRFM :: (MonadState (PRFState zq zp) mon, Rescale zq zp)
 latticePRFM s x = state $ latticePRF' s x
 
 -- | Equation (2.10) in [BP14].
-ringPRF' :: (Fact m, RescaleCyc (Cyc t) zq zp, Ring rq,
+ringPRF' :: (Fact m, CElt t zq, Rescale (UCyc t m D zq) (UCyc t m D zp), Ring rq,
             rq ~ Cyc t m zq, rp ~ Cyc t m zp)
     => rq -> Int -> PRFState rq rp -> (Matrix rp, PRFState rq rp)
 ringPRF' s x state1 =
   let (res,state2) = evalTree x state1
   in ((rescaleDec . (s*)) <$> res, state2)
 
-ringPRF :: (Fact m, RescaleCyc (Cyc t) zq zp, Ring rq,
+ringPRF :: (Fact m, CElt t zq, Rescale (UCyc t m D zq) (UCyc t m D zp), Ring rq,
             rq ~ Cyc t m zq, rp ~ Cyc t m zp)
     => rq -> Int -> PRFState rq rp -> Matrix rp
 ringPRF s x = fst . ringPRF' s x
 
 ringPRFM :: (MonadState (PRFState rq rp) mon, Fact m,
-             RescaleCyc (Cyc t) zq zp, Ring rq,
+             Rescale (UCyc t m D zq) (UCyc t m D zp), CElt t zq, Ring rq,
              rq ~ Cyc t m zq, rp ~ Cyc t m zp)
   => rq -> Int -> mon (Matrix rp)
 ringPRFM s x = state $ ringPRF' s x

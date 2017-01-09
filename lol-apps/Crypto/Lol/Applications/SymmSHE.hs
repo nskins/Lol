@@ -25,7 +25,7 @@ SK, PT, CT -- don't export constructors!
 -- * Arithmetic with public values
 , addScalar, addPublic, mulScalar, mulPublic
 -- * Modulus switching
-, rescaleLinearCT, modSwitchPT
+, rescaleLinearCT, modSwitchPT, RescaleCtx
 -- * Key switching
 , KSLinearHint, KSQuadCircHint
 , ksLinearHint, ksQuadCircHint
@@ -47,7 +47,7 @@ import qualified Algebra.Additive as Additive (C)
 import qualified Algebra.Ring     as Ring (C)
 
 import Crypto.Lol as LP hiding (sin)
-import Crypto.Lol.Cyclotomic.UCyc   (D, UCyc)
+import Crypto.Lol.Cyclotomic.UCyc   (P, D, UCyc)
 import Crypto.Lol.Reflects
 import Crypto.Lol.Types.Proto
 import Crypto.Proto.Lol.R (R)
@@ -141,7 +141,7 @@ errorTerm :: (ErrorTermCtx t m' z zp zq)
              => SK (Cyc t m' z) -> CT m zp (Cyc t m' zq) -> Cyc t m' (LiftOf zq)
 errorTerm (SK _ s) = let sq = reduce s in
   \ct -> let (CT LSD _ _ c) = toLSD ct
-         in liftCyc Dec $ evaluate c sq
+         in liftDec $ evaluate c sq
 
 -- for when we know the division must succeed
 divG' :: (Fact m, CElt t r, IntegralDomain r) => Cyc t m r -> Cyc t m r
@@ -215,7 +215,8 @@ toLSD = let (zpScale, zqScale) = msdToLSD
 ---------- Modulus switching ----------
 
 -- | Rescale a linear polynomial in MSD encoding, for best noise behavior.
-rescaleLinearMSD :: (RescaleCyc (Cyc t) zq zq', Fact m')
+rescaleLinearMSD :: (Rescale (UCyc t m' P zq) (UCyc t m' P zq'), Rescale zq zq',
+                     Rescale (UCyc t m' D zq) (UCyc t m' D zq'), CElt t zq, Fact m')
                     => Polynomial (Cyc t m' zq) -> Polynomial (Cyc t m' zq')
 rescaleLinearMSD c = case coeffs c of
   [] -> fromCoeffs []
@@ -226,8 +227,13 @@ rescaleLinearMSD c = case coeffs c of
   _ -> error $ "rescaleLinearMSD: list too long (not linear): " ++
        show (length $ coeffs c)
 
+type RescaleCtx t m' zp zq zq' =
+  (Rescale (UCyc t m' P zq) (UCyc t m' P zq'),
+   Rescale (UCyc t m' D zq) (UCyc t m' D zq'),
+   Rescale zq zq', ToSDCtx t m' zp zq)
+
 -- | Rescale a linear ciphertext to a new modulus.
-rescaleLinearCT :: (RescaleCyc (Cyc t) zq zq', ToSDCtx t m' zp zq)
+rescaleLinearCT :: (RescaleCtx t m' zp zq zq')
            => CT m zp (Cyc t m' zq) -> CT m zp (Cyc t m' zq')
 rescaleLinearCT ct = let CT MSD k l c = toMSD ct
                      in CT MSD k l $ rescaleLinearMSD c
@@ -302,7 +308,9 @@ switch hint c = untag $ knapsack <$> hint <*> (fmap reduce <$> decompose c)
 
 -- | Constraint synonym for key switching.
 type KeySwitchCtx gad t m' zp zq zq' =
-  (RescaleCyc (Cyc t) zq' zq, RescaleCyc (Cyc t) zq zq',
+  (Rescale (UCyc t m' P zq) (UCyc t m' P zq'), Rescale zq zq',
+   Rescale (UCyc t m' P zq') (UCyc t m' P zq), Rescale zq' zq,
+   Rescale (UCyc t m' D zq') (UCyc t m' D zq),
    ToSDCtx t m' zp zq, SwitchCtx gad t m' zq')
 
 -- | Hint for a linear key switch

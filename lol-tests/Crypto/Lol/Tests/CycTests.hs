@@ -60,7 +60,7 @@ prop_mulgCRT x =
 prop_coeffsBasis :: forall t m m' r . _
   => Cyc t m' r -> Test '(t,m,m',r)
 prop_coeffsBasis x =
-  let xs = map embed (coeffsCyc Pow x :: [Cyc t m r])
+  let xs = map embed (coeffsPow x :: [Cyc t m r])
       bs = proxy powBasis (Proxy::Proxy m)
   in test $ (sum $ zipWith (*) xs bs) == x
 
