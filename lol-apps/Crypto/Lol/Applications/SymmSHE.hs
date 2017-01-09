@@ -413,9 +413,9 @@ instance (Eq zp, MulScalarCtx t m' zp zq, m `Divides` m', ToSDCtx t m' zp zq)
 
   -- the scales, g-exponents of ciphertexts, and MSD/LSD types must match.
   ct1@(CT enc1 k1 l1 c1) + ct2@(CT enc2 k2 l2 c2)
-    | l1 /= l2 =
-        let (CT enc' k' _ c') = mulScalar (l1*(recip l2)) ct1
-        in (CT enc' k' l2 c') + ct2
+    | l1 /= l2 =error ""
+        --let (CT enc' k' _ c') = mulScalar (l1*(recip l2)) ct1
+        --in (CT enc' k' l2 c') + ct2
     | k1 < k2 = iterate mulGCT ct1 !! (k2-k1) + ct2
     | k1 > k2 = ct1 + iterate mulGCT ct2 !! (k1-k2)
     | enc1 == LSD && enc2 == MSD = toMSD ct1 + ct2
