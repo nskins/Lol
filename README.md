@@ -12,6 +12,22 @@ On the other hand, it lets us get rid of RescaleCyc!
 The constraints get annoying since they involve UCyc; it would probably be best
 to export constraint synonyms for rescalePow/rescaleDec from Cyc.
 
+**UPDATE**
+After a meeting, we discussed some of the challenges. We could get rid of overlapping instances
+by changing the generic instance to ZqBasic, but this solves nothing: the Cyc funcs still need
+a constraint 'Rescale (UCyc ...)' in order to be polymorphic over the base ring.
+
+We could get rid of the Sub optimization for Cyc.rescalePow, but we still need the
+constraint, and the beauty of RescaleCyc is that it does not involve the index.
+Currently, this would be the only constraint that involves both the index and the base ring,
+which are otherwise orthogonal. Also, there's no way to write rescaleCyc with just
+the Rescale dictionary on the base rings (indeed, the optimized algorithm doesn't even use
+Rescale on the base rings.)
+
+We don't have a concrete reason yet, but we expect that having the constraint that involves the index and base ring might mean death in the compiler.
+
+We're stuck with RescaleCyc for now.
+
 --------------------------------------------------------------------------------
 
 This repository contains several Haskell libraries:
