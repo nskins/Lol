@@ -89,8 +89,8 @@ encrypt (svar, (aBar, aBarT)) mu = do
   let gadM = untag $ (gadTM
             :: Tagged gad (Matrix (Cyc t m zq)))
   -- Note: av = (aBar, aBarT + v*>gadM), but we never actually need "av."
-      b = ( (scale s aBar) + eBar,
-            (scale s ( aBarT + ( (v*>) <$> gadM ) ) ) + ek)
+      addError a e = (scale s a) + e
+      b = (addError aBar eBar, addError (aBarT + ((v*>) <$> gadM)) ek)
   return (v, b)
 
 -- | Constraint synonym for decryption.
@@ -107,14 +107,14 @@ decrypt :: (DecryptCtx fp d t m z zp zq gad) =>
 decrypt (sk, (svar, (aBar, aBarT))) (v, (bBar, bk)) = do
   let bHat = tag $ concat $ rows $ (bk - (bBar * (reduce <$> sk)))
   _ <- bHat
+  gadM <- gadTM
   let (sHat, _) = correct bHat
       s = (recip v) *> sHat
-  gadM <- gadTM
-  let e = (liftDec <$> (bBar - (scale s aBar)),
-           liftDec <$> (bk - (scale s (aBarT + ((v*>) <$> gadM)))))
-  if isShortVector svar e
-  then return $ reduce (index (fst e) 0 0)
-  else return $ reduce (index (fst e) 0 0) -- TODO: unknown.. what should 'else' return?
+      scaleAndLift b a = liftDec <$> (b - scale s a)
+      (eBar, ek) = (scaleAndLift bBar aBar, scaleAndLift bk (aBarT + ((v*>) <$> gadM)))
+  if isShortVector svar (eBar, ek)
+  then return $ reduce (index eBar 0 0)
+  else return $ reduce (index eBar 0 0) -- TODO: unknown.. what should 'else' return?
 
 -- | Returns true if the cyclotomic ring element is short with
 -- respect to the scaled variance parameter.
@@ -128,7 +128,8 @@ isShortVector :: (CElt t z, Fact m, Ord z) => z ->
                  (Matrix (Cyc t m z), Matrix (Cyc t m z)) -> Bool
 isShortVector svar (eBar, ek) =
   let ([l], [r]) = (rows eBar, rows ek)
-  in (all (isShort svar) l) && (all (isShort svar) r)
+      allShort = all $ isShort svar
+  in allShort l && allShort r
 
 -- | Generates a matrix with m rows and n columns.
 -- Possible alg: getRandom, (errorRounded y), etc.
